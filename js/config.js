@@ -16,6 +16,10 @@ window.CHURCH_CONFIG = {
   // 대한성서공회 개역개정. 형식: 주소 + 책코드.장  (예: .../NKRV/JHN.3)
   bibleBase: 'https://bible.bskorea.or.kr/bible/NKRV/',
 
+  // R2 공개 버킷 주소. 채우면 시트의 파일 칸에 파일 이름만 적어도 이 주소 뒤에 붙는다.
+  // 예: 'https://pub-xxxx.r2.dev/'  (칸에 https://로 시작하는 전체 주소를 적으면 그 주소를 그대로 쓴다)
+  fileBase: '',
+
   // 마지막 글이 이 기간(년)보다 오래된 메뉴는 숨긴다. 0이면 이 규칙을 끈다.
   staleYears: 2,
 

@@ -1,6 +1,6 @@
 /* ============================================================
    데이터 계층 (디자인과 무관)
-   - 구글 시트 CSV 읽기, 열 정리, 정렬, 숨김 규칙, 성경·드라이브·유튜브 주소 만들기
+   - 구글 시트 CSV 읽기, 열 정리, 정렬, 숨김 규칙, 성경·파일(R2 주소/파일명, 드라이브)·유튜브 주소 만들기
    ============================================================ */
 (function () {
   'use strict';
@@ -37,6 +37,28 @@
   function driveIds(s) {
     return String(s || '').split(/[,\s]+/).map(driveId).filter(Boolean);
   }
+  // 파일 칸 하나를 해석한다. 판별 순서: 전체 URL → 드라이브 링크/ID → fileBase + 파일명
+  //   반환: { drive:true, id } (드라이브) | { drive:false, url } (R2 등 그대로 쓰는 주소) | null
+  function fileRef(s) {
+    s = trim(s);
+    if (!s) return null;
+    var id = driveId(s), base = trim(C.fileBase);
+    if (/^https?:\/\//i.test(s)) {
+      if (id && /^https?:\/\/(drive|docs)\.google\.com\//i.test(s)) return { drive: true, id: id };
+      return { drive: false, url: s };
+    }
+    if (id) return { drive: true, id: id };
+    if (/^(\.\/|img\/)/.test(s)) return { drive: false, url: s };   // 저장소 안 예시 이미지
+    if (!base) return null;
+    if (!/\/$/.test(base)) base += '/';
+    return { drive: false, url: base + s.replace(/^\/+/, '').split('/').map(enc).join('/') };
+  }
+  function fileRefs(s) {
+    return String(s || '').split(/[,\s]+/).map(fileRef).filter(Boolean);
+  }
+  function refKey(f) { return f.drive ? f.id : f.url; }
+  function refThumb(f, w) { return f.drive ? drive.thumb(f.id, w) : f.url; }
+  function refDownload(f) { return f.drive ? drive.download(f.id) : f.url; }
   // 유튜브 영상 ID: watch?v=, youtu.be/, /live/, /embed/, /shorts/ 모두 받는다.
   function youtubeId(s) {
     s = trim(s);
@@ -117,28 +139,27 @@
   function byDateDesc(a, b) { return (b.date || '').localeCompare(a.date || '') || b._r - a._r; }
 
   function normSermon(r) {
-    var iso = isoDate(r.date), id = r.id || String(r._row), cat = r.category || '', vid = youtubeId(r.video), q = trim(r.question), qid;
+    var iso = isoDate(r.date), id = r.id || String(r._row), cat = r.category || '', vid = youtubeId(r.video), q = fileRef(r.question);
     if (!r.title && !iso) return null;
-    qid = driveId(q);
     return {
       id: id, _r: r._row, category: cat, date: iso, dateDot: dotDate(iso), dateKo: koDate(iso), dateLong: longDate(iso),
       title: r.title || '', passage: r.passage || '', passageUrl: bibleUrl(r.passage), preacher: r.preacher || '',
       video: vid, videoEmbed: vid ? 'https://www.youtube.com/embed/' + vid : '', videoWatch: vid ? 'https://www.youtube.com/watch?v=' + vid : '',
-      questionUrl: /^https?:/i.test(q) && !qid ? q : (qid ? drive.download(qid) : C.questionUrl || ''),
+      questionUrl: q ? refDownload(q) : C.questionUrl || '',
       detailUrl: 'sermons.html?c=' + enc(cat) + '&id=' + enc(id), listUrl: 'sermons.html' + (cat ? '?c=' + enc(cat) : '')
     };
   }
 
   function normPost(r) {
-    var iso = isoDate(r.date), id = r.id || String(r._row), board = r.board || '', fid = driveId(r.file_id), pid = driveId(r.photo_id);
+    var iso = isoDate(r.date), id = r.id || String(r._row), board = r.board || '', fid = fileRef(r.file_id), pid = fileRef(r.photo_id);
     if (!board || !r.title) return null;
     return {
       id: id, _r: r._row, board: board, date: iso, dateDot: dotDate(iso), dateKo: koDate(iso), dateLong: longDate(iso),
       title: r.title, body: r.body || '',
-      fileId: fid, fileUrl: fid ? drive.download(fid) : '', fileName: fid ? (r.file_name || '첨부파일') : '',
-      photoId: pid, photoThumb: pid ? drive.thumb(pid, 700) : '',
-      images: driveIds(r.image_ids).map(function (x, i) {
-        return { id: x, title: r.title, n: i + 1, thumbUrl: drive.thumb(x, 900), downloadUrl: drive.download(x) };
+      fileId: fid ? refKey(fid) : '', fileUrl: fid ? refDownload(fid) : '', fileName: fid ? (r.file_name || '첨부파일') : '',
+      photoId: pid ? refKey(pid) : '', photoThumb: pid ? refThumb(pid, 700) : '',
+      images: fileRefs(r.image_ids).map(function (x, i) {
+        return { id: refKey(x), isDrive: x.drive, title: r.title, n: i + 1, thumbUrl: refThumb(x, 900), downloadUrl: refDownload(x) };
       }),
       pinned: /^(y|yes|1|true|o|예)$/i.test(r.pinned || ''),
       detailUrl: 'board.html?b=' + enc(board) + '&id=' + enc(id), listUrl: 'board.html?b=' + enc(board)
@@ -146,11 +167,11 @@
   }
 
   function normPhoto(r) {
-    var id = driveId(r.file_id), iso = isoDate(r.date), album = r.album || '기타';
-    if (!id) return null;
+    var f = fileRef(r.file_id), iso = isoDate(r.date), album = r.album || '기타';
+    if (!f) return null;
     return {
-      id: id, _r: r._row, album: album, date: iso, dateDot: dotDate(iso), title: r.title || '',
-      thumbUrl: drive.thumb(id, 500), bigUrl: drive.thumb(id, 1600), downloadUrl: drive.download(id),
+      id: refKey(f), isDrive: f.drive, _r: r._row, album: album, date: iso, dateDot: dotDate(iso), title: r.title || '',
+      thumbUrl: refThumb(f, 500), bigUrl: refThumb(f, 1600), downloadUrl: refDownload(f),
       albumUrl: 'album.html?a=' + enc(album)
     };
   }
@@ -162,11 +183,11 @@
   }
 
   function normPage(r) {
-    var slug = trim(r.slug), img = driveId(r.image_id);
+    var slug = trim(r.slug), img = fileRef(r.image_id);
     if (!slug || !(r.body || img || r.link_url)) return null;
     return {
       id: slug, _r: r._row, slug: slug, title: r.title || '', body: r.body || '',
-      imageId: img, imageThumb: img ? drive.thumb(img, 1200) : '', link: /^https?:/i.test(r.link_url || '') ? r.link_url : '', linkLabel: r.link_label || '바로가기'
+      imageId: img ? refKey(img) : '', imageThumb: img ? refThumb(img, 1200) : '', link: /^https?:/i.test(r.link_url || '') ? r.link_url : '', linkLabel: r.link_label || '바로가기'
     };
   }
 
@@ -263,7 +284,7 @@
 
   window.Church = {
     config: C, load: load, getRows: getRows, isActive: isActive, parseCSV: parseCSV,
-    bibleUrl: bibleUrl, drive: drive, youtubeId: youtubeId, driveId: driveId, isoDate: isoDate,
+    bibleUrl: bibleUrl, drive: drive, youtubeId: youtubeId, driveId: driveId, fileRef: fileRef, isoDate: isoDate,
     errors: errors, isDemo: function () { return Object.keys(sampleUsed).length > 0; }
   };
 })();

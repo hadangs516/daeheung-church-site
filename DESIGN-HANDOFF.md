@@ -52,7 +52,16 @@ index.html 메인 / sermons.html 설교(목록+상세) / board.html 게시판(�
 - events: date, end_date, title, place
 - pages: slug, title, body, image_id, link_url, link_label
 각 탭을 `파일 > 공유 > 웹에 게시 > CSV` 로 게시해 나온 주소를 `js/config.js` 의 `sheets` 에 넣는다. 비워 두면 예시 데이터가 쓰이고 위에 예시 안내줄이 뜬다.
-드라이브 파일 ID 칸에는 ID나 공유 링크를 그대로 붙여 넣어도 된다.
+
+### 사진·파일 칸 (저장소: Cloudflare R2)
+`question`, `file_id`, `image_ids`, `photo_id`, `image_id` 칸의 의미는 "파일 주소 또는 파일 이름"이다(열 이름은 하위 호환으로 유지).
+- `https://`로 시작하는 전체 주소: 그대로 쓴다. 썸네일·크게보기·다운로드가 모두 같은 주소다(R2는 썸네일을 만들지 않으므로 올릴 때 사진을 가로 약 1600px로 줄여 올린다).
+- 파일 이름만 적기(예 `2026-11-08-bulletin.jpg`): `config.js`의 `fileBase`(R2 공개 버킷 주소, 예 `https://pub-xxxx.r2.dev/`) 뒤에 붙는다. 한글·공백은 자동 인코딩된다. `fileBase`가 비어 있으면 이 방식은 동작하지 않는다.
+- `image_ids`는 주소/파일 이름 여러 개를 쉼표·공백·줄바꿈으로 구분한다.
+- (하위 호환) 구글 드라이브 ID나 공유 링크도 그대로 인식한다. 판별 순서: 전체 주소 → 드라이브 링크/ID → `fileBase`+파일 이름.
+- 개인정보가 든 파일은 R2 공개 버킷에 올리지 않는다.
+
+**다운로드 버튼:** R2 주소는 다른 도메인이라 `<a download>`가 무시될 수 있어, 다운로드 링크는 `target="_blank" rel="noopener"`로 새 창(탭)에서 열린다(`data-external`이 이 동작을 한다). 디자인 HTML에서 다운로드 링크에 `download` 속성에 기대지 말고 `data-href` + `data-external`을 쓴다. 사진 뷰어의 "이미지 실패 시 드라이브 미리보기로 대체"는 드라이브 ID일 때만 동작한다.
 
 ## 초안 단계 설정
 `config.js` 의 `showAll: true` 이면 내용이 없거나 오래된 메뉴·탭·바로가기도 모두 보이고, 빈 목록과 빈 페이지에는 `messages.preparing`("준비 중입니다.")가 뜬다. `false` 로 바꾸면 `staleYears` 숨김 규칙이 다시 적용된다.

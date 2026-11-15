@@ -102,19 +102,20 @@
     openDialog(dlgNotice);
   }
   function openViewer(row) {
-    var id = row.id, big = row.bigUrl || Ch.drive.thumb(id, 1600), body, bar, img, a;
+    var id = row.id, big = row.bigUrl || (row.isDrive ? Ch.drive.thumb(id, 1600) : id), body, bar, img, a;
     if (!dlgView) dlgView = makeDialog('ch-viewer');
     dlgView.textContent = '';
     bar = doc.createElement('div'); bar.className = 'ch-viewer-bar';
     var t = doc.createElement('strong'); t.textContent = row.title || '';
     bar.appendChild(t);
     a = doc.createElement('a'); a.className = 'ch-btn'; a.textContent = '다운로드';
-    a.href = row.downloadUrl || Ch.drive.download(id); a.target = '_blank'; a.rel = 'noopener';
+    a.href = row.downloadUrl || (row.isDrive ? Ch.drive.download(id) : id); a.target = '_blank'; a.rel = 'noopener';
     bar.appendChild(a);
     bar.appendChild(button('닫기', 'ch-btn', function () { dlgView.close(); }));
     body = doc.createElement('div'); body.className = 'ch-viewer-body';
     img = doc.createElement('img'); img.alt = row.title || '';
-    img.onerror = function () {   // 썸네일이 안 열리면 드라이브 미리보기 화면으로 대신한다
+    img.onerror = function () {   // 썸네일이 안 열리면 드라이브 미리보기 화면으로 대신한다 (드라이브 파일일 때만)
+      if (!row.isDrive) return;
       var f = doc.createElement('iframe');
       f.src = Ch.drive.preview(id); f.title = row.title || '미리보기';
       body.textContent = ''; body.appendChild(f);

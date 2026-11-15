@@ -2,12 +2,12 @@
    예시 데이터 (config.js의 sheets 주소가 비어 있을 때만 쓰임)
    - 열 이름은 구글 시트 탭의 첫 줄과 같다.
    - 설교의 날짜, 본문, 설교자 중 최신 3건은 유튜브 공식 채널의 실제 날짜·본문이고(설교자 이름은 가림)
-     제목과 나머지는 모두 가짜다. 사진 ID는 시험용 드라이브 폴더 파일이다.
+     제목과 나머지는 모두 가짜다. 사진은 저장소 안 img/sample-*.svg(단색 그림)이다.
    ============================================================ */
 (function () {
   'use strict';
-  var P1 = '1LuYhM521-5rKfoKIVJle7Lg9ITLH7uot';
-  var P2 = '1uudEeJvZJ2u7fdee7ba49jbLwZiXPwAo';
+  var P1 = 'img/sample-1.svg';
+  var P2 = 'img/sample-2.svg';
   var PASSAGES = ['요한복음 3:1-8', '시편 23:1-6', '로마서 8:28-39', '요한일서 4:7-12', '빌립보서 2:1-11',
     '야고보서 1:2-8', '고린도전서 13:1-13', '창세기 12:1-9', '이사야 40:27-31', '사도행전 2:42-47',
     '마태복음 5:1-12', '히브리서 11:1-6', '에베소서 4:1-6', '골로새서 3:12-17', '잠언 3:5-6'];
@@ -45,7 +45,7 @@
     posts.push({ board: 'notice', date: d, title: '공지사항 예시 ' + (12 - i), body: '공지사항 본문 예시입니다.\n\n두 번째 문단 예시입니다.' });
   });
   back('2026-11-08', 6, 7).forEach(function (d) {
-    posts.push({ board: 'bulletin', date: d, title: ko(d) + ' 주보 (예시)', body: '', image_ids: P1 + ',' + P2 + ',' + P1 });
+    posts.push({ board: 'bulletin', date: d, title: ko(d) + ' 주보 (예시)', body: '', image_ids: P1 + ' ' + P2 + ' ' + P1 });
   });
   [['2026-10-21', 3], ['2026-10-14', 2], ['2026-10-07', 1]].forEach(function (a) {
     posts.push({ board: 'newfamily', date: a[0], title: '새가족 예시 ' + a[1] + ' · 소속 예시', body: '환영합니다. (예시 글입니다. 실제 이름과 사진은 교회 승인 후에 정합니다.)' });
