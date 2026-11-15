@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>포항대흥교회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body >
+<a class="skip" href="#main">본문으로 바로가기</a>
+<div class="demo-bar" data-when="demo">시안 단계입니다. 화면의 글, 숫자, 일정은 예시 데이터입니다.</div>
+<div class="demo-bar err" data-when="load-error">일부 내용을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>
+<div class="util"><div class="wrap">
+  <span><span data-bind="church.address"></span> · 전화 <a data-bind="church.phone" data-bind-tel="church.phone"></a></span>
+  <span class="util-links">
+    <button type="button" class="linkbtn" data-notice="notBuilt">관리자 메일</button>
+    <button type="button" class="linkbtn" data-notice="notBuilt">신앙상담</button>
+  </span>
+</div></div>
+<header class="site"><div class="wrap bar">
+  <h1 class="brand"><a href="index.html"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4v7h7v4h-7v9h-4v-9H3V9h7z"/></svg><span data-bind="church.name"></span></a></h1>
+  <button type="button" class="menu-btn" data-menu-toggle aria-expanded="false" aria-controls="gnb">메뉴</button>
+  <nav class="gnb" id="gnb" data-menu aria-label="주 메뉴">
+    <template><div class="grp"><button type="button" class="gnb-top" data-text="label"></button>
+      <div class="sub" data-menu-items><template><a data-text="label" data-href="href"></a></template></div></div></template>
+  </nav>
+</div></header>
+<main id="main">
+
+<section class="banner" aria-label="환영 인사"><svg class="scene" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe8ef"/><stop offset="1" stop-color="#f2fbfc"/></linearGradient><radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs><rect width="1440" height="400" fill="url(#sky)"/><circle cx="1040" cy="180" r="200" fill="url(#glow)"/><path d="M0 318 C240 292 430 314 650 286 S1060 226 1440 268 V400 H0Z" fill="#b9e3ea"/><path d="M1040 150V240M1014 178H1066" stroke="#0c7886" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M0 356 C260 330 520 348 770 316 S1190 268 1440 298 V400 H0Z" fill="#62c3d1"/><path d="M0 394 C300 376 600 386 900 352 S1260 330 1440 346 V400 H0Z" fill="#0c7886"/></svg>
+  <div class="wrap"><div class="banner-in">
+    <h2>포항대흥교회에<br>오신 것을 환영합니다</h2>
+    <p>처음 오셨다면 예배 안내와 찾아오시는 길을 먼저 확인해 보세요.</p>
+    <div class="btns">
+      <a class="btn btn-fill" href="page.html?s=worship-info" data-requires="pages:worship-info">예배 안내</a>
+      <a class="btn" href="page.html?s=directions" data-requires="pages:directions">찾아오시는 길</a>
+    </div>
+  </div></div>
+</section>
+<div class="wrap"><nav class="quick" aria-label="바로가기">
+<a href="page.html?s=worship-info" data-requires="pages:worship-info"><span class="ic blue"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>예배 안내</a>
+<a href="page.html?s=directions" data-requires="pages:directions"><span class="ic teal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.6-6-10a6 6 0 0 1 12 0c0 4.4-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></span>찾아오시는 길</a>
+<a href="board.html?b=bulletin" data-requires="posts:bulletin"><span class="ic gold"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/></svg></span>주보</a>
+<a data-bind-href="questionUrl"><span class="ic blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg></span>설교 질문지</a>
+<a href="page.html?s=giving" data-requires="pages:giving"><span class="ic teal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>헌금·기부금 안내</a>
+<a href="schedule.html" data-requires="events"><span class="ic gold"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="1"/><path d="M4 10h16M8 3v4M16 3v4"/></svg></span>교회 일정</a>
+</nav></div>
+
+<section class="word" aria-label="이번 주 말씀" data-when="word"><div class="wrap">
+  <div class="word-in" id="word" data-detail="sermons:주일오전예배" data-detail-first>
+    <div>
+      <p class="label">이번 주 말씀 · <span data-text="category"></span> · <span data-text="dateLong"></span></p>
+      <h2 data-text="title"></h2>
+      <p>본문 <a class="passage" data-text="passage" data-href="passageUrl" data-external></a></p>
+      <p class="meta">설교 <span data-text="preacher"></span></p>
+    </div>
+    <div class="btns">
+      <a class="btn btn-gold" data-href="passageUrl" data-href-optional data-external>본문 읽기</a>
+      <a class="btn btn-ghost" data-href="videoWatch" data-href-optional data-external>영상 보기</a>
+      <a class="btn btn-ghost" data-href="questionUrl" data-href-optional data-external>설교 질문지 받기</a>
+    </div>
+  </div>
+</div></section>
+
+<section class="sec"><div class="wrap"><div class="two">
+  <div data-tabs data-limit="5" data-hide-if-empty>
+    <h2>교회 소식</h2>
+    <div class="tabs" role="tablist"><button type="button" data-tab="posts:notice" data-more-href="board.html?b=notice">공지사항</button><button type="button" data-tab="posts:bulletin" data-more-href="board.html?b=bulletin">주보</button><button type="button" data-tab="posts:newfamily" data-more-href="board.html?b=newfamily">새가족소개</button></div>
+    <ul class="rows" data-tab-list><template><li><a class="t" data-text="title" data-href="detailUrl"></a><span class="d" data-text="dateDot"></span></li></template></ul>
+    <p class="empty" data-tab-empty hidden data-bind="messages.preparing"></p>
+    <p class="more"><a data-more href="board.html?b=notice">더 보기</a></p>
+  </div>
+  <div data-calendar data-hide-if-empty id="cal">
+    <h2>교회 일정</h2>
+    <div class="cal-head"><button type="button" data-cal-prev>이전 달</button><strong data-cal-title></strong><button type="button" data-cal-next>다음 달</button></div>
+    <div class="cal-grid" data-cal-grid></div>
+    <ul class="cal-list" data-cal-list><template><li><span class="when" data-text="range"></span><span><span data-text="title"></span> <span class="meta" data-text="place"></span></span></li></template></ul>
+    <p class="empty" data-cal-empty>이번 달 일정이 없습니다.</p>
+    <p class="more"><a href="schedule.html">전체 일정 보기</a></p>
+  </div>
+</div></div></section>
+
+<section class="sec alt"><div class="wrap">
+  <h2>최근 설교</h2>
+  <div data-tabs data-limit="5" id="sermon-tabs">
+    <div class="tabs" role="tablist"><button type="button" data-tab="sermons:주일오전예배" data-more-href="sermons.html?c=%EC%A3%BC%EC%9D%BC%EC%98%A4%EC%A0%84%EC%98%88%EB%B0%B0">주일오전예배</button><button type="button" data-tab="sermons:주일오후예배" data-more-href="sermons.html?c=%EC%A3%BC%EC%9D%BC%EC%98%A4%ED%9B%84%EC%98%88%EB%B0%B0">주일오후예배</button><button type="button" data-tab="sermons:수요기도회" data-more-href="sermons.html?c=%EC%88%98%EC%9A%94%EA%B8%B0%EB%8F%84%ED%9A%8C">수요기도회</button></div>
+    <table class="tbl"><thead><tr><th>날짜</th><th>제목</th><th>본문</th><th>설교자</th></tr></thead>
+    <tbody data-tab-list><template><tr><td class="nw" data-l="날짜" data-text="dateDot"></td><td><a class="t" data-text="title" data-href="detailUrl"></a></td>
+      <td data-l="본문"><a class="passage" data-text="passage" data-href="passageUrl" data-external></a></td><td data-l="설교자" data-text="preacher"></td></tr></template></tbody></table>
+    <p class="empty" data-tab-empty hidden data-bind="messages.preparing"></p>
+    <p class="more"><a data-more href="sermons.html">설교 더 보기</a></p>
+  </div>
+</div></section>
+
+</main>
+<footer class="foot">
+  <div class="wrap foot-grid">
+    <div><strong data-bind="church.name"></strong>
+      <p><span data-bind="church.address"></span><br>전화 <span data-bind="church.phone"></span><br>팩스 <span data-bind="church.fax"></span></p></div>
+    <div><strong>자주 찾는 곳</strong><ul class="flinks">
+      <li data-requires="pages:worship-info"><a href="page.html?s=worship-info">예배 안내</a></li>
+      <li data-requires="pages:directions"><a href="page.html?s=directions">찾아오시는 길</a></li>
+      <li data-requires="posts:bulletin"><a href="board.html?b=bulletin">주보</a></li>
+      <li data-requires="posts:notice"><a href="board.html?b=notice">공지사항</a></li></ul></div>
+    <div><strong>방문자</strong><p class="visits"><span class="pill">오늘 <span data-bind="visitor.today"></span> · 전체 <span data-bind="visitor.total"></span></span><br>
+      <span class="note" data-when="visitor-demo">(예시 숫자입니다)</span></p></div>
+  </div>
+  <div class="wrap copy">포항대흥교회 홈페이지</div>
+</footer>
+<script src="js/config.js"></script>
+<script src="js/sample-data.js"></script>
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
