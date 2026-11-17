@@ -24,23 +24,15 @@
 
   /* ---------- 확인창 ---------- */
   const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const trapFocus = (e, root) => {
-    if (e.key !== 'Tab') return;
-    const items = [...root.querySelectorAll('button,a[href],input,select,textarea,[tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
-    const first = items[0], last = items[items.length - 1];
-    if (!first) return;
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  };
   const Modal = window.Modal = {
     open({ title, body, actions }) {
       return new Promise(resolve => {
         const prev = document.activeElement;
-        const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', title || '안내');
+        const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
         m.innerHTML = '<div class="modal-box">' + (title ? '<h3 class="modal-t">' + escH(title) + '</h3>' : '') + '<div class="modal-body">' + body + '</div><div class="modal-act">' +
           actions.map((a, i) => '<button type="button" class="btn ' + (a.kind || '') + '" data-modal="' + i + '">' + escH(a.label) + '</button>').join('') + '</div></div>';
         const done = v => { document.removeEventListener('keydown', key); m.remove(); document.body.classList.remove('lock'); prev && prev.focus && prev.focus(); resolve(v); };
-        const key = e => { if (e.key === 'Escape') done(null); else trapFocus(e, m); };
+        const key = e => { if (e.key === 'Escape') done(null); };
         m.addEventListener('click', e => { const b = e.target.closest('[data-modal]'); if (b) done(actions[+b.dataset.modal].value); else if (e.target === m) done(null); });
         document.addEventListener('keydown', key); document.body.append(m); document.body.classList.add('lock');
         const f = m.querySelector('[data-modal]:last-child'); f && f.focus();
@@ -83,21 +75,20 @@
     const group = t.closest('[data-gallery]'), all = group ? [...group.querySelectorAll('[data-view]')] : [t];
     const srcOf = x => x.dataset.src || x.getAttribute('src');
     let i = Math.max(0, all.indexOf(t));
-    const prevFocus = document.activeElement;
-    const lb = document.createElement('div'); lb.className = 'lightbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', '사진 크게 보기');
+    const lb = document.createElement('div'); lb.className = 'lightbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true');
     const draw = () => {
       lb.innerHTML = '<button class="lb-x" data-lb="close" aria-label="닫기"><span class="ms">close</span></button>' +
         (all.length > 1 ? '<button class="lb-nav prev" data-lb="prev" aria-label="이전 사진"><span class="ms">chevron_left</span></button><button class="lb-nav next" data-lb="next" aria-label="다음 사진"><span class="ms">chevron_right</span></button>' : '') +
         '<img src="' + srcOf(all[i]) + '" alt=""><div class="lb-bar">' + (all.length > 1 ? '<span>' + (i + 1) + ' / ' + all.length + '</span>' : '') +
         '<a class="btn sm" href="' + srcOf(all[i]) + '" download="photo-' + (i + 1) + '.jpg"><span class="ms">download</span>내려받기</a></div>';
     };
-    const key = ev => { if (ev.key === 'Escape') close(); if (ev.key === 'ArrowLeft') { ev.preventDefault(); go(-1); } if (ev.key === 'ArrowRight') { ev.preventDefault(); go(1); } trapFocus(ev, lb); };
-    const close = () => { lb.remove(); document.body.classList.remove('lock'); document.removeEventListener('keydown', key); if (prevFocus && prevFocus.focus) prevFocus.focus(); };
-    const go = d => { if (all.length > 1) { const control = document.activeElement && document.activeElement.dataset.lb; i = (i + d + all.length) % all.length; draw(); (lb.querySelector('[data-lb="' + (control || 'close') + '"]') || lb.querySelector('.lb-x')).focus(); } };
+    const key = ev => { if (ev.key === 'Escape') close(); if (ev.key === 'ArrowLeft') go(-1); if (ev.key === 'ArrowRight') go(1); };
+    const close = () => { lb.remove(); document.removeEventListener('keydown', key); };
+    const go = d => { if (all.length > 1) { i = (i + d + all.length) % all.length; draw(); } };
     lb.addEventListener('click', ev => {
       const b = ev.target.closest('[data-lb]');
       if (b) { if (b.dataset.lb === 'close') close(); else go(b.dataset.lb === 'next' ? 1 : -1); } else if (ev.target === lb) close();
     });
-    document.addEventListener('keydown', key); draw(); document.body.append(lb); document.body.classList.add('lock'); lb.querySelector('.lb-x').focus();
+    document.addEventListener('keydown', key); draw(); document.body.append(lb);
   });
 })();
