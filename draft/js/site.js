@@ -103,7 +103,7 @@
       const pb = POST_BODY[b];
       body = `<div class="prose">${pb ? pb.map(t => `<p>${t}</p>`).join('') : `<p>${esc(p.title)} 내용을 알려 드립니다.</p>
         <p>성도 여러분의 많은 관심과 기도 부탁드립니다.</p>
-        <p>· 일시: 2026년 11월 22일(주일) 오후 2:00<br>· 장소: 본당<br>· 문의: 교회 사무실 ${CHURCH.phone}</p>`}</div>
+        <p>· 일시: 2026년 11월 22일(주일) 오후 3:30<br>· 장소: 본당<br>· 문의: 교회 사무실 ${CHURCH.phone}</p>`}</div>
         ${B.photo ? `<div class="post-photos">${PHOTOS.slice(1, 4).map(s => `<img src="${s}" alt="" data-view>`).join('')}</div>` : ''}
         ${B.file || p.hasFile ? '<div class="attach"><span class="ms">attach_file</span><a href="#">안내문.pdf</a><span class="size">(320KB)</span><a class="btn sm line" href="#">내려받기</a></div>' : ''}`;
     }
