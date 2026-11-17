@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
 <link rel="stylesheet" href="home.css">
+<link rel="stylesheet" href="member.css">
 </head>
 <body>
 
@@ -73,7 +74,7 @@
     <!-- 3 공지사항 -->
     <article class="card c3">
       <div class="card-hd"><h2><span class="ms">campaign</span>공지사항</h2><a class="more" href="board.html?b=notice">더보기<span class="ms">chevron_right</span></a></div>
-      <ul class="list">
+      <ul class="list" data-slot="home-notice">
         <li><a href="board-view.html?b=notice&id=1"><span class="t">추수감사주일 안내</span><span class="d">11.15</span></a></li>
         <li><a href="board-view.html?b=notice&id=2"><span class="t">성탄절 찬양대 연습 일정</span><span class="d">11.12</span></a></li>
         <li><a href="board-view.html?b=notice&id=3"><span class="t">겨울 성경학교 교사 모집</span><span class="d">11.08</span></a></li>
@@ -115,7 +116,7 @@
       <div class="map"><img src="img/map.jpg" alt="교회 위치 지도"></div>
       <p class="addr">경북 포항시 남구 희망대로 466</p>
       <p class="tel"><span class="ms">call</span>054-275-3121</p>
-      <div class="map-btns"><a href="#">카카오맵</a><a href="#">네이버 지도</a></div>
+      <div class="map-btns"><button type="button" data-action="soon">카카오맵</button><button type="button" data-action="soon">네이버</button><button type="button" data-action="soon">티맵</button></div>
     </article>
 
     <!-- 7 포토앨범 -->
@@ -137,6 +138,9 @@
 <footer class="ft" id="ft"></footer>
 
 <script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/member.js"></script>
 <script src="js/site.js"></script>
 </body>
 </html>

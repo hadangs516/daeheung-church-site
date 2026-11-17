@@ -49,6 +49,9 @@ const BOARDS = {
   overseas:  { title: '해외선교', titles: ['필리핀 선교사님 소식','캄보디아 단기선교 보고','몽골 선교지 기도 제목','해외선교 후원 안내','선교사 가정 방문 소식','단기선교팀 모집'], photo: true },
   elder:     { title: '노인대학', titles: ['2학기 종강식 안내','가을 소풍 다녀왔습니다','건강 체조 시간 사진','한글 교실 작품 전시','노인대학 봉사자 모집','2학기 개강 안내'], photo: true }
 };
+/* 글쓰기 권한: all=누구나(게스트 포함) / admin=관리자 모드에서만 / none=글쓰기 없음 */
+const WRITE_RULE = { freeboard: 'all', men: 'all', women: 'all', notice: 'admin', dawn: 'admin', newfamily: 'admin', events: 'admin', domestic: 'admin', overseas: 'admin', elder: 'admin', bulletin: 'none' };
+const RANKS = ['목사','전도사','장로','안수집사','권사','서리집사','성도','새가족','청년','학생'];
 const BOARD_DATES = ['2026.11.15','2026.11.12','2026.11.08','2026.11.03','2026.10.29','2026.10.25','2026.10.18','2026.10.11','2026.10.04','2026.09.27','2026.09.20','2026.09.13'];
 const PHOTOS = ['img/album-1.jpg','img/album-2.jpg','img/album-3.jpg','img/album-4.jpg','img/album-5.jpg','img/hero-interior.jpg','img/hero-exterior.jpg'];
 
@@ -116,7 +119,7 @@ const EVENTS = [
 
 /* ---------- 글 페이지 ---------- */
 const TBL = (head, rows) => '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
-const VIDEO = (title) => '<div class="video-ph"><img src="img/hero-interior.jpg" alt=""><span class="play"><span class="ms">play_arrow</span></span><span class="cap">' + title + '</span></div>';
+const VIDEO = (title) => '<div class="video-ph" data-action="soon"><img src="img/hero-interior.jpg" alt=""><span class="play"><span class="ms">play_arrow</span></span><span class="cap">' + title + '</span></div>';
 
 const PAGES = {
   greeting: { body: `
@@ -167,14 +170,14 @@ const PAGES = {
       <div><dt>버스</dt><dd>○○ 정류장 하차 후 도보 3분 (시내버스 ○○○번, ○○○번)</dd></div>
       <div><dt>주차</dt><dd>교회 앞마당 및 교육관 뒤편 주차장 이용</dd></div>
     </dl>
-    <div class="btn-row"><a class="btn" href="#">카카오맵으로 보기</a><a class="btn line" href="#">네이버 지도로 보기</a><a class="btn line" href="#" data-copy="경북 포항시 남구 희망대로 466"><span class="ms">content_copy</span>주소 복사</a></div>` },
+    <div class="btn-row"><button type="button" class="btn" data-action="soon">카카오맵으로 보기</button><button type="button" class="btn line" data-action="soon">네이버 지도로 보기</button><button type="button" class="btn line" data-action="soon">티맵으로 보기</button><a class="btn line" href="#" data-copy="경북 포항시 남구 희망대로 466"><span class="ms">content_copy</span>주소 복사</a></div>` },
   shuttle: { body: '<p class="page-lead">주일 오전에 교회 차량이 운행됩니다. 이용하실 분은 교회 사무실로 연락해 주세요.</p>' +
     '<h3 class="h3">1호차 (주일 1부)</h3>' + TBL(['정류장','시간'], [['○○아파트 정문','오전 8:50'],['○○시장 앞','오전 9:00'],['○○초등학교','오전 9:10'],['교회 도착','오전 9:20']]) +
     '<h3 class="h3">2호차 (주일 2부)</h3>' + TBL(['정류장','시간'], [['○○동 행정복지센터','오전 11:15'],['○○병원 앞','오전 11:25'],['○○아파트 후문','오전 11:35'],['교회 도착','오전 11:45']]) +
     '<p class="note-box"><span class="ms">call</span>차량 문의: 교회 사무실 054-275-3121</p>' },
   sns: { body: '<p class="page-lead">교회 소식을 SNS에서도 만나보세요.</p><ul class="sns">' +
     [['smart_display','유튜브','설교 실황 영상','#e62117'],['photo_camera','인스타그램','교회 사진과 소식','#c13584'],['chat','카카오톡 채널','공지와 주보 알림','#f5c400'],['groups','네이버 밴드','부서별 모임 소식','#2db400']]
-      .map(s => '<li><a href="#"><span class="sns-ic ms" style="background:' + s[3] + '">' + s[0] + '</span><b>' + s[1] + '</b><span>' + s[2] + '</span><span class="go ms">open_in_new</span></a></li>').join('') + '</ul>' },
+      .map(s => '<li><a href="#" data-action="soon"><span class="sns-ic ms" style="background:' + s[3] + '">' + s[0] + '</span><b>' + s[1] + '</b><span>' + s[2] + '</span><span class="go ms">open_in_new</span></a></li>').join('') + '</ul>' },
   praise1: { body: VIDEO('11월 15일 주일 1부 예배 찬양') + '<h3 class="h3">지난 찬양</h3>' + TBL(['날짜','찬양'], [['2026.11.15','감사 찬양 (찬양팀)'],['2026.11.08','주 은혜임을 (찬양팀)'],['2026.11.01','은혜 아니면 (찬양팀)'],['2026.10.25','내 영혼이 은총 입어 (찬양팀)']]) },
   praise2: { body: VIDEO('11월 15일 주일 2부 예배 찬양') + '<h3 class="h3">지난 찬양</h3>' + TBL(['날짜','찬양'], [['2026.11.15','감사의 노래 (찬양대)'],['2026.11.08','주의 사랑 (찬양대)'],['2026.11.01','거룩하신 주 (찬양대)'],['2026.10.25','평화의 기도 (찬양대)']]) },
   bonfire: { body: `
