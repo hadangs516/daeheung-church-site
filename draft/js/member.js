@@ -10,7 +10,7 @@
   const safeNext = n => /^[\w-]+\.html(\?[\w=&%.\-]*)?$/.test(n || '') ? n : 'home.html';
   const QUOTA_MSG = '저장 공간이 가득 찼습니다. 사진을 줄이거나 예전 글을 지운 뒤 다시 저장해 주세요.';
 
-  const trial = extra => `<div class="trial-box" role="note"><span class="ms">science</span><div><b>시험용 — 실제 비밀번호를 쓰지 마세요.</b><p>이 계정과 글은 이 브라우저에만 저장됩니다. ${extra || ''}</p></div></div>`;
+  const trial = extra => `<div class="trial-box" role="note"><div><b>시험용 — 실제 비밀번호를 쓰지 마세요.</b><p>이 계정과 글은 이 브라우저에만 저장됩니다. ${extra || ''}</p></div></div>`;
   const field = (label, input, key, hint) => `<div class="fld"><label><span class="fld-l">${label}</span>${input}</label>${hint ? `<p class="fld-h">${hint}</p>` : ''}<p class="field-err" data-err="${key}" role="alert"></p></div>`;
   const avatar = u => `<span class="avatar-m">${u && u.photo ? `<img src="${u.photo}" alt="">` : '<span class="ms">person</span>'}</span>`;
   const rankOpts = sel => RANKS.map(r => `<option${r === sel ? ' selected' : ''}>${r}</option>`).join('');
@@ -35,7 +35,7 @@
         <button class="btn block" type="submit">로그인</button>
       </form>
       <div class="mb-links"><a href="join.html${location.search}">회원가입</a><button type="button" data-action="soon">비밀번호 찾기</button></div>
-      <p class="mb-guest"><span class="ms">info</span>로그인하지 않아도 지금은 글쓰기와 댓글을 쓸 수 있습니다. 이때 작성자는 “게스트”로 표시됩니다.</p></div>`;
+      <p class="mb-guest">로그인하지 않아도 지금은 글쓰기와 댓글을 쓸 수 있습니다. 이때 작성자는 “게스트”로 표시됩니다.</p></div>`;
   }
   Actions.login = async form => {
     clearErr(form);
@@ -104,7 +104,7 @@
     if (!tabs.some(t => t[0] === TAB)) TAB = 'info';
     C.innerHTML = `<div class="mp">
       <aside class="mp-side"><div class="mp-me">${avatar(u)}<b>${esc(u.name)}</b><span>${esc(u.rank)}${pend ? '' : ''}</span>
-        ${pend ? '<em class="badge wait"><span class="ms">hourglass_top</span>승인 대기 중</em>' : '<em class="badge ok"><span class="ms">verified</span>승인됨</em>'}</div>
+        ${pend ? '<em class="badge wait">승인 대기 중</em>' : '<em class="badge ok">승인됨</em>'}</div>
         <label class="switch"><input type="checkbox" role="switch" data-action="admin-toggle"${admin ? ' checked' : ''}><span class="sw"></span><span class="sw-t">시험용 관리자 모드</span></label>
         <p class="sw-h">켜면 공지 글쓰기, 익명 글 작성자 확인, 신상 변경 승인을 해볼 수 있습니다.</p></aside>
       <section class="mp-main"><div class="tabs" role="tablist">${tabs.map(t => `<a href="#${t[0]}" role="tab" data-action="mp-tab" data-tab="${t[0]}"${t[0] === TAB ? ' class="on" aria-selected="true"' : ''}>${t[1]}</a>`).join('')}</div>
@@ -126,8 +126,8 @@
     if (tab === 'admin') return panelAdmin();
     /* 내 정보 */
     const p = u.pending || {}, val = k => (k in p ? p[k] : u[k]);
-    const need = '<span class="need-ok"><span class="ms">verified_user</span>변경 시 교회 승인 필요</span>';
-    const wait = k => k in p ? `<p class="fld-w"><span class="ms">hourglass_top</span>승인 대기 중 · 지금 표시되는 정보: ${esc(u[k] || '(없음)')}</p>` : '';
+    const need = '<span class="need-ok">변경 시 교회 승인 필요</span>';
+    const wait = k => k in p ? `<p class="fld-w">승인 대기 중 · 지금 표시되는 정보: ${esc(u[k] || '(없음)')}</p>` : '';
     return `${pend(u)}<form class="mb-form wide" data-action="profile-save" novalidate>
         <div class="mp-photo">${avatar(u)}<div><p class="fld-l">프로필 사진 <i class="opt">바로 반영</i></p>
           <button type="button" class="btn sm line" data-action="photo-pick"><span class="ms">photo_camera</span>사진 변경</button>
@@ -144,7 +144,7 @@
     function pend(u) {
       if (!u.pending) return '';
       const rows = Store.SENS.filter(k => k in u.pending).map(k => `<li><b>${Store.SENS_LABEL[k]}</b> ${esc(u[k] || '(없음)')} <span class="ms">arrow_forward</span> ${esc(u.pending[k] || '(없음)')}</li>`).join('');
-      return `<div class="pend-box"><div><b><span class="ms">hourglass_top</span>승인 대기 중</b><p>교회에서 승인하기 전까지는 이전 정보가 표시됩니다.</p><ul>${rows}</ul></div><button type="button" class="btn sm line" data-action="pending-cancel">요청 취소</button></div>`;
+      return `<div class="pend-box"><div><b>승인 대기 중</b><p>교회에서 승인하기 전까지는 이전 정보가 표시됩니다.</p><ul>${rows}</ul></div><button type="button" class="btn sm line" data-action="pending-cancel">요청 취소</button></div>`;
     }
   }
   function panelPosts() {
@@ -215,8 +215,9 @@
     if (editId) { post = Store.getPost(editId); if (!post || !(Store.isMine(post.owner))) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
     const who = m ? esc(m.name) : '게스트';
     C.innerHTML = `<form class="wr" data-action="post-save" data-board="${board}" data-edit="${post ? post.id : ''}" novalidate>
-      <p class="wr-as"><span class="ms">edit_note</span>${B.title} · 작성자 <b>${who}</b>${m ? '' : ' <i class="opt">(로그인하지 않아 게스트로 표시됩니다)</i>'}</p>
+      <p class="wr-as">${B.title} · 작성자 <b>${who}</b>${m ? '' : ' <i class="opt">(로그인하지 않아 게스트로 표시됩니다)</i>'}</p>
       <input class="wr-title" name="title" maxlength="100" placeholder="제목을 입력하세요" value="${post ? esc(post.title) : ''}" aria-label="제목">
+      <p class="field-err" data-err="title" role="alert"></p>
       ${B.anon ? `<div class="wr-anon" role="radiogroup" aria-label="작성자 표시"><span>작성자 표시</span><label><input type="radio" name="nm" value="real"${post && post.anon ? '' : ' checked'}> 이름 공개 (${who})</label><label><input type="radio" name="nm" value="anon"${post && post.anon ? ' checked' : ''}> 익명</label></div>` : ''}
       <div class="ed-wrap">
         <div class="ed-tb" role="toolbar" aria-label="글 꾸미기">
@@ -230,7 +231,7 @@
         </div>
         <div class="ed" id="ed" contenteditable="true" role="textbox" aria-multiline="true" aria-label="본문" data-placeholder="내용을 입력하세요. 사진은 한 줄에 한 장씩 크게 들어갑니다."></div>
       </div>
-      <p class="wr-hint"><span class="ms">info</span>사진은 긴 변 1200px 정도로 줄여 저장됩니다. 붙여넣으면 글자 모양은 지워지고 글자만 들어갑니다. <span data-usage></span></p>
+      <p class="wr-hint">사진은 긴 변 1200px 정도로 줄여 저장됩니다. 붙여넣으면 글자 모양은 지워지고 글자만 들어갑니다. <span data-usage></span></p>
       <p class="field-err" data-err="form" role="alert"></p>
       <div class="btn-row center"><a class="btn line" href="${post ? 'board-view.html?b=' + board + '&id=' + post.id : back}">취소</a><button class="btn" type="submit">${post ? '수정 저장' : '저장'}</button></div></form>`;
     const ed = $('#ed'); if (post) ed.innerHTML = Store.sanitize(post.html);
@@ -308,7 +309,7 @@
     root.innerHTML = `<section class="cmt-box" aria-label="댓글"><h3 class="cmt-h">댓글 <b>${list.length}</b></h3>
       ${list.length ? `<ul class="cmt-list">${list.map(c => `<li><div class="cmt-top"><b>${esc(c.name)}</b>${c.mine ? '<em class="me">내 댓글</em>' : ''}<span>${c.date}</span>${c.mine ? `<button type="button" class="cmt-del" data-action="cmt-del" data-id="${c.id}" aria-label="댓글 삭제"><span class="ms">delete</span></button>` : ''}</div><p>${esc(c.text).replace(/\n/g, '<br>')}</p></li>`).join('')}</ul>` : '<p class="cmt-none">첫 댓글을 남겨 보세요.</p>'}
       <form class="cmt-form" data-action="cmt-add" novalidate>
-        <p class="cmt-as"><span class="ms">person</span>${m ? esc(m.name) + '(으)로 작성' : '로그인하지 않아 “게스트”로 작성됩니다'}</p>
+        <p class="cmt-as">${m ? esc(m.name) + '(으)로 작성' : '로그인하지 않아 “게스트”로 작성됩니다'}</p>
         ${anonOk ? `<div class="wr-anon"><label><input type="radio" name="nm" value="real" checked> 이름 공개</label><label><input type="radio" name="nm" value="anon"> 익명</label></div>` : ''}
         <textarea name="text" rows="3" maxlength="500" placeholder="댓글을 입력하세요" aria-label="댓글"></textarea>
         <p class="field-err" data-err="text" role="alert"></p>
