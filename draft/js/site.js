@@ -37,7 +37,15 @@
       <button class="burger" id="burger" aria-label="메뉴 열기"><span class="ms">menu</span></button></div>`;
     const b = $('#burger'), g = $('#gnb');
     b.addEventListener('click', () => { const o = g.classList.toggle('open'); document.body.classList.toggle('lock', o); b.querySelector('.ms').textContent = o ? 'close' : 'menu'; });
-    g.querySelectorAll(':scope > ul > li > a').forEach(a => a.addEventListener('click', e => { if (innerWidth <= 1024) { e.preventDefault(); a.parentElement.classList.toggle('on'); } }));
+    /* 모바일: 상위 메뉴를 누르면 하위 메뉴가 부드럽게 펼쳐지고 접힌다 (높이 애니메이션 + 화살표 회전) */
+    g.querySelectorAll(':scope > ul > li > a').forEach(a => a.addEventListener('click', e => {
+      if (innerWidth > 1024) return;
+      e.preventDefault();
+      const li = a.parentElement, sb = li.querySelector('.sub'), open = !li.classList.contains('on');
+      li.classList.toggle('on', open); a.setAttribute('aria-expanded', open);
+      sb.style.height = open ? sb.scrollHeight + 'px' : '0px';
+    }));
+    addEventListener('resize', () => { if (innerWidth > 1024) g.querySelectorAll('.sub').forEach(x => x.style.height = ''); });
   }
 
   /* ---------- 푸터 ---------- */
@@ -111,18 +119,18 @@
     const total = posts.length, page = Math.min(Math.max(1, +Q.get('p') || 1), Math.max(1, Math.ceil(total / size)));
     const view = posts.slice((page - 1) * size, page * size);
     const tools = `<div class="bd-tools"><p class="bd-count">${q ? `“${esc(q)}” 검색 결과 ` : '전체 '}<b>${total}</b>건${q ? ` · <a class="bd-all" href="board.html?b=${b}">전체 보기</a>` : ''}</p>
-      <form class="bd-search" action="board.html" method="get" role="search"><input type="hidden" name="b" value="${b}"><input type="search" name="q" value="${esc(q)}" placeholder="검색어를 입력하세요" aria-label="검색어"><button type="submit" aria-label="검색"><span class="ms">search</span></button></form>
-      ${canWrite(b) ? `<a class="btn sm" href="write.html?b=${b}"><span class="ms">edit</span>글쓰기</a>` : ''}</div>`;
-    if (!total) { C.innerHTML = tools + `<p class="empty">${q ? '검색 결과가 없습니다.' : '등록된 글이 없습니다.'}</p>`; }
+      <form class="bd-search" action="board.html" method="get" role="search"><input type="hidden" name="b" value="${b}"><input type="search" name="q" value="${esc(q)}" placeholder="검색어를 입력하세요" aria-label="검색어"><button type="submit" aria-label="검색"><span class="ms">search</span></button></form></div>`;
+    const foot = pg => `<div class="bd-foot"><span></span>${pg || '<span></span>'}${canWrite(b) ? `<a class="btn" href="write.html?b=${b}"><span class="ms">edit</span>글쓰기</a>` : '<span></span>'}</div>`;
+    if (!total) { C.innerHTML = tools + `<p class="empty">${q ? '검색 결과가 없습니다.' : '등록된 글이 없습니다.'}</p>` + foot(''); }
     else if (B.bulletin) {
       C.innerHTML = tools + `<ul class="bul-grid">${view.map(p => `<li><a href="board-view.html?b=${b}&id=${p.id}">
         <span class="b-cover"><span class="b-church">${CHURCH.name}</span><span class="b-title">주 보</span><span class="b-no">${p.title.replace(' 주보', '')}</span><img src="${PHOTOS[(+p.id + 3) % 5]}" alt=""></span>
-        <span class="bul-t">${p.title}</span></a></li>`).join('')}</ul>` + pager(total, size, page);
+        <span class="bul-t">${p.title}</span></a></li>`).join('')}</ul>` + foot(pager(total, size, page));
     } else {
       C.innerHTML = tools + `<ul class="bd-list"><li class="bd-head"><span class="no">번호</span><span class="t">제목</span><span class="w">글쓴이</span><span class="d">날짜</span><span class="v">조회</span></li>
         ${view.map((p, i) => `<li${p.pinned ? ' class="pin"' : ''}><span class="no">${p.pinned ? '<em>공지</em>' : total - ((page - 1) * size + i)}</span>
         <a class="t" href="board-view.html?b=${b}&id=${p.id}"><span class="t-txt">${esc(p.title)}</span>${p.comments ? `<span class="cmt-n" aria-label="댓글 ${p.comments}개">[${p.comments}]</span>` : ''}${p.hasFile ? '<span class="ms att" title="첨부파일">attach_file</span>' : ''}${p.hasPhoto ? '<span class="ms att" title="사진">image</span>' : ''}${p.user && Store.isMine(p.owner) ? '<em class="me">내 글</em>' : ''}</a>
-        <span class="w">${esc(p.author)}</span><span class="d">${p.date}</span><span class="v">${p.views}</span></li>`).join('')}</ul>` + pager(total, size, page);
+        <span class="w">${esc(p.author)}</span><span class="d">${p.date}</span><span class="v">${p.views}</span></li>`).join('')}</ul>` + foot(pager(total, size, page));
     }
   }
 
@@ -153,11 +161,12 @@
     /* 같은 게시판의 다른 글 (현재 글과 가까운 5개) */
     const others = posts.map((x, k) => ({ x, k })).filter(o => o.x.id !== id).sort((a, c) => Math.abs(a.k - i) - Math.abs(c.k - i)).slice(0, 5).sort((a, c) => a.k - c.k).map(o => o.x);
     C.innerHTML = `<article class="post"><header class="post-hd"><h3>${esc(p.title)}</h3>
+        <button type="button" class="share-btn" data-action="share" data-title="${esc(p.title)}" aria-label="공유"><span class="ms">share</span></button>
         <p class="post-meta"><span>${esc(p.author)}</span><span>${p.date}</span><span>조회 ${p.views}</span>${B.bulletin ? '' : `<span>댓글 <b data-cmt-count>${p.comments}</b></span>`}${U && U.edited ? '<span>수정됨</span>' : ''}</p></header>
         <div class="post-body">${body}</div></article>
-      <div class="post-actions"><a class="btn line" href="board.html?b=${b}"><span class="ms">list</span>목록으로</a><span class="pa-r">
-        <button type="button" class="btn line" data-copy="page"><span class="ms">share</span>공유</button><button type="button" class="btn line" data-action="print"><span class="ms">print</span>인쇄</button>
-        ${mine ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span></div>
+      <div class="post-actions"><span class="pa-l">
+        ${mine ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
+        <a class="btn" href="board.html?b=${b}"><span class="ms">list</span>목록</a></div>
       ${B.bulletin ? '' : '<div id="cmt"></div>'}
       ${others.length ? `<section class="related" aria-label="같은 게시판의 다른 글"><h3 class="rel-h">${B.title}의 다른 글</h3><ul class="rel-list">${others.map(x => `<li><a href="board-view.html?b=${b}&id=${x.id}"><span class="rel-t">${esc(x.title)}${x.comments ? `<span class="cmt-n">(${x.comments})</span>` : ''}</span><span class="rel-m">${esc(x.author)}<i></i>${x.date}</span></a></li>`).join('')}</ul></section>` : ''}`;
     if (!B.bulletin) Member.comments($('#cmt'), b, id);
@@ -179,8 +188,9 @@
     const more = SERMONS.filter(x => x.cat === s.cat && x.id !== s.id).slice(0, 3);
     C.innerHTML = `<div class="sv-player" data-action="soon" role="button" tabindex="0" aria-label="영상 재생"><img src="${s.thumb}" alt=""><span class="play big"><span class="ms">play_arrow</span></span><span class="yt-note">유튜브 영상이 들어갈 자리</span></div>
       <div class="sv-info"><span class="sc-cat">${s.cat}</span><h3>${s.title}</h3>
+        <button type="button" class="share-btn" data-action="share" data-title="${esc(s.title)}" aria-label="공유"><span class="ms">share</span></button>
         <p class="sv-meta"><span><span class="ms">menu_book</span><a href="#" data-action="soon">${s.passage}</a></span><span><span class="ms">person</span>${s.preacher}</span><span><span class="ms">calendar_today</span>${s.date}</span></p>
-        <div class="btn-row"><button type="button" class="btn" data-action="soon"><span class="ms">description</span>설교 질문지 받기</button><button type="button" class="btn line" data-action="soon"><span class="ms">open_in_new</span>본문 읽기</button><button type="button" class="btn line" data-copy="page"><span class="ms">share</span>공유</button></div></div>
+        <div class="btn-row"><button type="button" class="btn" data-action="soon"><span class="ms">description</span>설교 질문지 받기</button><button type="button" class="btn line" data-action="soon"><span class="ms">open_in_new</span>본문 읽기</button></div></div>
       <h3 class="h3">${s.cat} 다른 설교</h3><ul class="sermon-grid three">${more.map(sermonCard).join('')}</ul>
       <div class="btn-row center"><a class="btn line" href="sermons.html?c=${encodeURIComponent(s.cat)}">목록으로</a></div>`;
   }

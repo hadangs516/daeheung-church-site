@@ -52,6 +52,7 @@
     const fn = Actions[el.dataset.action]; if (fn) { if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault(); fn(el, e); }
   });
   document.addEventListener('change', e => { const el = e.target.closest('[data-action]'); if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && Actions[el.dataset.action]) Actions[el.dataset.action](el, e); });
+  document.addEventListener('input', e => { const el = e.target.closest && e.target.closest('[data-oninput]'); if (el && Actions[el.dataset.oninput]) Actions[el.dataset.oninput](el, e); });
   document.addEventListener('submit', e => { const f = e.target.closest('form[data-action]'); if (f && Actions[f.dataset.action]) { e.preventDefault(); Actions[f.dataset.action](f, e); } });
   document.addEventListener('keydown', e => { const el = e.target.closest && e.target.closest('[role="button"][data-action]'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); el.click(); } });
   /* 주소 복사 (공유) */
@@ -61,7 +62,37 @@
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).catch(() => { const t = document.createElement('textarea'); t.value = text; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch (er) {} t.remove(); });
     toast('주소를 복사했습니다');
   });
-  Actions.print = () => window.print();
+
+
+  /* ---------- 공유 ----------
+     휴대폰(터치 기기)은 기본 공유 창(navigator.share), 그 밖(PC 등)은 아래 하단 시트를 띄운다. */
+  const Sheet = window.Sheet = {
+    open(html) {
+      const bg = document.createElement('div'); bg.className = 'sheet-bg'; bg.setAttribute('role', 'dialog'); bg.setAttribute('aria-modal', 'true'); bg.setAttribute('aria-label', '공유');
+      bg.innerHTML = '<div class="sheet"><span class="sheet-grip"></span>' + html + '</div>';
+      const close = () => { document.removeEventListener('keydown', key); bg.classList.remove('open'); setTimeout(() => bg.remove(), 280); };
+      const key = e => { if (e.key === 'Escape') close(); };
+      bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-sheet-close]')) close(); });
+      document.addEventListener('keydown', key); document.body.append(bg); requestAnimationFrame(() => requestAnimationFrame(() => bg.classList.add('open')));
+      return close;
+    }
+  };
+  const copyText = text => (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).catch(() => { const t = document.createElement('textarea'); t.value = text; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch (er) {} t.remove(); });
+  Actions.share = async el => {
+    const title = el.dataset.title || document.title, url = location.href;
+    if (navigator.share && matchMedia('(pointer:coarse)').matches) {
+      try { await navigator.share({ title, text: title, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }   // 실패하면 아래 시트로
+    }
+    const enc = encodeURIComponent, body = title + ' ' + url;
+    Sheet.open('<div class="sheet-head"><span class="sheet-ic"><span class="ms">link</span></span><div class="sheet-t"><b>' + escH(title) + '</b><span>' + escH(url) + '</span></div></div>' +
+      '<button type="button" class="sheet-copy" data-action="share-copy">복사</button>' +
+      '<div class="sheet-row"><button type="button" class="k" data-action="soon" data-sheet-close><i><span class="ms">chat</span></i>카카오톡</button>' +
+      '<a class="s" href="sms:?&body=' + enc(body) + '" data-sheet-close><i><span class="ms">sms</span></i>문자</a>' +
+      '<a class="e" href="mailto:?subject=' + enc(title) + '&body=' + enc(body) + '" data-sheet-close><i><span class="ms">mail</span></i>이메일</a>' +
+      '<button type="button" class="c" data-action="share-copy"><i><span class="ms">content_copy</span></i>주소 복사</button></div>');
+    document.querySelector('.sheet').dataset.url = url;
+  };
+  Actions['share-copy'] = el => { copyText(el.closest('.sheet').dataset.url || location.href); toast('주소를 복사했습니다'); const b = el.closest('.sheet-bg'); b.classList.remove('open'); setTimeout(() => b.remove(), 280); };
 
   /* ---------- 맨 위로 ---------- */
   const top = document.createElement('button'); top.className = 'to-top'; top.setAttribute('aria-label', '맨 위로'); top.setAttribute('data-action', 'to-top');

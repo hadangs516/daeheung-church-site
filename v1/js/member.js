@@ -11,7 +11,8 @@
   const QUOTA_MSG = '저장 공간이 가득 찼습니다. 사진을 줄이거나 예전 글을 지운 뒤 다시 저장해 주세요.';
 
   const trial = extra => `<div class="trial-box" role="note"><span class="ms">science</span><div><b>시험용 — 실제 비밀번호를 쓰지 마세요.</b><p>이 계정과 글은 이 브라우저에만 저장됩니다. ${extra || ''}</p></div></div>`;
-  const field = (label, input, key, hint) => `<div class="fld"><label><span class="fld-l">${label}</span>${input}</label>${hint ? `<p class="fld-h">${hint}</p>` : ''}<p class="field-err" data-err="${key}" role="alert"></p></div>`;
+  const pwf = (name, ac) => `<span class="pw-wrap"><input name="${name}" type="password" autocomplete="${ac}"><button type="button" class="pw-eye" data-action="pw-toggle" aria-label="비밀번호 보기"><span class="ms">visibility</span></button></span>`;
+  const field = (label, input, key, hint, div) => `<div class="fld">${div ? `<div role="group"><span class="fld-l">${label}</span>${input}</div>` : `<label><span class="fld-l">${label}</span>${input}</label>`}${hint ? `<p class="fld-h">${hint}</p>` : ''}<p class="field-err" data-err="${key}" role="alert"></p></div>`;
   const avatar = u => `<span class="avatar-m">${u && u.photo ? `<img src="${u.photo}" alt="">` : '<span class="ms">person</span>'}</span>`;
   const rankOpts = sel => RANKS.map(r => `<option${r === sel ? ' selected' : ''}>${r}</option>`).join('');
 
@@ -30,7 +31,7 @@
     C.innerHTML = `<div class="mb-card">${trial('정식판에서는 교회 승인 후 이용할 수 있습니다.')}
       <form class="mb-form" data-action="login" novalidate>
         ${field('아이디', '<input name="username" autocomplete="username" maxlength="20" autocapitalize="off">', 'username')}
-        ${field('비밀번호', '<input name="password" type="password" autocomplete="current-password">', 'password')}
+        ${field('비밀번호', pwf('password', 'current-password'), 'password')}
         <p class="field-err" data-err="form" role="alert"></p>
         <button class="btn block" type="submit">로그인</button>
       </form>
@@ -53,20 +54,20 @@
   /* ================= 회원가입 ================= */
   function join(C) {
     if (Store.me()) { location.replace('mypage.html'); return; }
-    const todayISO = new Date().toISOString().slice(0, 10);
     C.innerHTML = `<div class="mb-card">${trial('시험판에서는 가입하면 바로 로그인됩니다. 정식판에서는 교회 승인 후 이용할 수 있습니다.')}
       <form class="mb-form" data-action="join" novalidate>
         ${field('이름', '<input name="name" autocomplete="name" maxlength="20">', 'name')}
-        ${field('아이디', '<input name="username" autocomplete="username" maxlength="20" autocapitalize="off">', 'username', '영문·숫자·밑줄(_) 4~20자')}
-        ${field('비밀번호', '<input name="password" type="password" autocomplete="new-password">', 'password', '6자 이상')}
-        ${field('비밀번호 확인', '<input name="password2" type="password" autocomplete="new-password">', 'password2')}
-        ${field('생년월일', `<input name="birth" type="date" min="1900-01-01" max="${todayISO}">`, 'birth')}
+        ${field('아이디', '<input name="username" autocomplete="username" maxlength="20" autocapitalize="off" data-action="id-check">', 'username', '영문·숫자·밑줄(_) 4~20자')}
+        ${field('비밀번호', pwf('password', 'new-password'), 'password', '6자 이상')}
+        ${field('비밀번호 확인', pwf('password2', 'new-password'), 'password2')}
+        ${field('생년월일', WheelDate.html('birth', ''), 'birth', null, true)}
         ${field('직분', `<select name="rank"><option value="">선택해 주세요</option>${rankOpts('')}</select>`, 'rank')}
-        ${field('휴대폰 <i class="opt">(선택)</i>', '<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000">', 'phone')}
+        ${field('휴대폰 <i class="opt">(선택)</i>', '<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000" data-oninput="phone-fmt">', 'phone')}
         <p class="field-err" data-err="form" role="alert"></p>
         <button class="btn block" type="submit">가입하고 로그인</button>
       </form>
       <div class="mb-links"><span>이미 계정이 있나요?</span><a href="login.html${location.search}">로그인</a></div></div>`;
+    WheelDate.init(C);
   }
   Actions.join = async form => {
     clearErr(form);
@@ -86,16 +87,24 @@
     } catch (e) { busy(form, false); setErr(form, 'form', e.message); }
   };
 
+  Actions['pw-toggle'] = el => { const i = el.parentElement.querySelector('input'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.querySelector('.ms').textContent = show ? 'visibility_off' : 'visibility'; el.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기'); };
+  Actions['id-check'] = el => {
+    const v = el.value.trim(), box = el.closest('.fld').querySelector('[data-err]'); if (!v) return;
+    if (!/^[A-Za-z0-9_]{4,20}$/.test(v)) { box.className = 'field-err'; box.textContent = '아이디는 영문·숫자·밑줄(_) 4~20자로 입력해 주세요.'; return; }
+    const taken = Store.usernameTaken(v); box.className = taken ? 'field-err' : 'field-ok'; box.textContent = taken ? '이미 사용 중인 아이디입니다.' : '사용할 수 있는 아이디입니다.';
+  };
+  Actions['phone-fmt'] = el => { const d = el.value.replace(/[^0-9]/g, '').slice(0, 11); el.value = d.length > 7 ? d.slice(0, 3) + '-' + d.slice(3, d.length - 4) + '-' + d.slice(-4) : d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; };
+
   /* ================= 로그아웃 (헤더·마이페이지 공통) ================= */
   Actions.logout = () => { Store.logout(); toastLater('로그아웃했습니다'); location.href = 'home.html'; };
 
   /* ================= 마이페이지 ================= */
-  let TAB = 'info';
+  let TAB = 'info', EDIT = false;
   function mypage(C) {
     if (!Store.me()) { location.replace('login.html?next=mypage.html'); return; }
-    TAB = (location.hash || '').slice(1) || 'info';
+    TAB = (location.hash || '').slice(1) || 'info'; if (TAB === 'edit') { TAB = 'info'; EDIT = true; }   // mypage.html#edit → 바로 수정 화면
     drawMy(C);
-    addEventListener('hashchange', () => { TAB = (location.hash || '').slice(1) || 'info'; drawMy(); });
+    addEventListener('hashchange', () => { TAB = (location.hash || '').slice(1) || 'info'; EDIT = false; drawMy(); });
   }
   function drawMy(C) {
     C = C || $('#content'); const u = Store.me(); if (!u) return;
@@ -103,28 +112,38 @@
     const tabs = [['info', '내 정보'], ['posts', '내가 쓴 글'], ['pw', '비밀번호 변경'], ['acct', '계정']].concat(admin ? [['admin', '승인 관리' + (pcount ? ' (' + pcount + ')' : '')]] : []);
     if (!tabs.some(t => t[0] === TAB)) TAB = 'info';
     C.innerHTML = `<div class="mp">
-      <aside class="mp-side"><div class="mp-me">${avatar(u)}<b>${esc(u.name)}</b><span>${esc(u.rank)}${pend ? '' : ''}</span>
-        ${pend ? '<em class="badge wait"><span class="ms">hourglass_top</span>승인 대기 중</em>' : '<em class="badge ok"><span class="ms">verified</span>승인됨</em>'}</div>
+      <div class="mp-col"><aside class="mp-side"><div class="mp-me">${avatar(u)}<b>${esc(u.name)}</b><span>${esc(u.rank)}${pend ? '' : ''}</span>
+        ${pend ? '<em class="badge wait"><span class="ms">hourglass_top</span>승인 대기 중</em>' : '<em class="badge ok"><span class="ms">verified</span>승인됨</em>'}</div></aside>
+      <aside class="mp-test" aria-label="시험용 도구"><p class="mp-test-t"><span class="ms">science</span>시험용 도구</p>
         <label class="switch"><input type="checkbox" role="switch" data-action="admin-toggle"${admin ? ' checked' : ''}><span class="sw"></span><span class="sw-t">시험용 관리자 모드</span></label>
-        <p class="sw-h">켜면 공지 글쓰기, 익명 글 작성자 확인, 신상 변경 승인을 해볼 수 있습니다.</p></aside>
+        <p class="sw-h">켜면 공지 글쓰기, 익명 글 작성자 확인, 신상 변경 승인을 해볼 수 있습니다.</p></aside></div>
       <section class="mp-main"><div class="tabs" role="tablist">${tabs.map(t => `<a href="#${t[0]}" role="tab" data-action="mp-tab" data-tab="${t[0]}"${t[0] === TAB ? ' class="on" aria-selected="true"' : ''}>${t[1]}</a>`).join('')}</div>
         <div class="mp-panel" data-panel="${TAB}">${panel(u, TAB)}</div></section></div>`;
+    WheelDate.init(C);
   }
-  Actions['mp-tab'] = (el, e) => { e.preventDefault(); TAB = el.dataset.tab; history.replaceState(null, '', '#' + TAB); drawMy(); };
+  const fmtBirth = b => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(b || ''); return m ? `${+m[1]}년 ${+m[2]}월 ${+m[3]}일` : '(없음)'; };
+  Actions['info-edit'] = () => { EDIT = true; drawMy(); scrollTo({ top: 0 }); };
+  Actions['info-cancel'] = () => { EDIT = false; drawMy(); };
+  Actions['mp-tab'] = (el, e) => { e.preventDefault(); TAB = el.dataset.tab; EDIT = false; history.replaceState(null, '', '#' + TAB); drawMy(); };
 
   function panel(u, tab) {
     if (tab === 'posts') return panelPosts();
     if (tab === 'pw') return `<form class="mb-form wide" data-action="pw-change" novalidate>
-        ${field('현재 비밀번호', '<input name="cur" type="password" autocomplete="current-password">', 'cur')}
-        ${field('새 비밀번호', '<input name="next" type="password" autocomplete="new-password">', 'next', '6자 이상')}
-        ${field('새 비밀번호 확인', '<input name="next2" type="password" autocomplete="new-password">', 'next2')}
+        ${field('현재 비밀번호', pwf('cur', 'current-password'), 'cur')}
+        ${field('새 비밀번호', pwf('next', 'new-password'), 'next', '6자 이상')}
+        ${field('새 비밀번호 확인', pwf('next2', 'new-password'), 'next2')}
         <p class="field-err" data-err="form" role="alert"></p><button class="btn" type="submit">비밀번호 변경</button></form>`;
     if (tab === 'acct') return `<div class="acct"><div class="acct-row"><div><b>로그아웃</b><p>이 브라우저에서 로그아웃합니다.</p></div><button type="button" class="btn line" data-action="logout">로그아웃</button></div>
         <div class="acct-row"><div><b>탈퇴</b><p>시험 계정과, 이 계정으로 쓴 글·댓글이 모두 삭제됩니다. 되돌릴 수 없습니다.</p></div><button type="button" class="btn danger" data-action="withdraw">탈퇴하기</button></div>
         <div class="acct-row"><div><b>시험 데이터 전체 초기화</b><p>이 브라우저에 저장된 모든 시험 계정·글·댓글을 지웁니다.</p></div><button type="button" class="btn line" data-action="reset-all">전체 초기화</button></div>
         <p class="fld-h">저장 공간 사용: 약 ${Store.usageKB().toLocaleString()}KB / 5,000KB (브라우저마다 다릅니다)</p></div>`;
     if (tab === 'admin') return panelAdmin();
-    /* 내 정보 */
+    /* 내 정보 — 처음엔 읽기 전용, '내 정보 수정'을 눌러야 수정 칸이 나온다 */
+    if (!EDIT) {
+      const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+      return `${pend(u)}<div class="mp-view"><div class="mp-photo">${avatar(u)}<div class="mp-v-id"><b class="mp-v-name">${esc(u.name)}</b><span class="mp-v-rank">${esc(u.rank)}</span></div><button type="button" class="btn sm line mp-v-edit" data-action="info-edit"><span class="ms">edit</span>내 정보 수정</button></div>
+        <dl class="info mp-dl">${row('이름', esc(u.name))}${row('직분', esc(u.rank))}${row('생년월일', fmtBirth(u.birth))}${row('연락처', esc(u.phone) || '(없음)')}${row('자기소개', u.bio ? esc(u.bio).replace(/\n/g, '<br>') : '<span class="muted">(아직 없습니다)</span>')}</dl></div>`;
+    }
     const p = u.pending || {}, val = k => (k in p ? p[k] : u[k]);
     const need = '<span class="need-ok"><span class="ms">verified_user</span>변경 시 교회 승인 필요</span>';
     const wait = k => k in p ? `<p class="fld-w"><span class="ms">hourglass_top</span>승인 대기 중 · 지금 표시되는 정보: ${esc(u[k] || '(없음)')}</p>` : '';
@@ -137,10 +156,10 @@
         <div class="fld-grid">
         <div>${field('이름 ' + need, `<input name="name" maxlength="20" value="${esc(val('name'))}">`, 'name')}${wait('name')}</div>
         <div>${field('직분 ' + need, `<select name="rank">${rankOpts(val('rank'))}</select>`, 'rank')}${wait('rank')}</div>
-        <div>${field('생년월일 ' + need, `<input name="birth" type="date" value="${esc(val('birth'))}">`, 'birth')}${wait('birth')}</div>
-        <div>${field('연락처 ' + need, `<input name="phone" type="tel" inputmode="tel" value="${esc(val('phone'))}" placeholder="010-0000-0000">`, 'phone')}${wait('phone')}</div></div>
+        <div>${field('생년월일 ' + need, WheelDate.html('birth', val('birth')), 'birth', null, true)}${wait('birth')}</div>
+        <div>${field('연락처 ' + need, `<input name="phone" type="tel" inputmode="tel" value="${esc(val('phone'))}" placeholder="010-0000-0000" data-oninput="phone-fmt">`, 'phone')}${wait('phone')}</div></div>
         <p class="field-err" data-err="form" role="alert"></p>
-        <div class="btn-row"><button class="btn" type="submit">정보 수정</button></div></form>`;
+        <div class="btn-row end"><button type="button" class="btn line" data-action="info-cancel">취소</button><button class="btn" type="submit">저장</button></div></form>`;
     function pend(u) {
       if (!u.pending) return '';
       const rows = Store.SENS.filter(k => k in u.pending).map(k => `<li><b>${Store.SENS_LABEL[k]}</b> ${esc(u[k] || '(없음)')} <span class="ms">arrow_forward</span> ${esc(u.pending[k] || '(없음)')}</li>`).join('');
@@ -186,7 +205,7 @@
     }
     const r = Store.updateProfile(Object.assign({ bio: form.bio.value.trim() }, sens));
     if (!r.ok) return Modal.alert(esc(r.error));
-    toast(changed.length ? '변경을 요청했습니다 (승인 대기 중)' : '저장했습니다'); drawMy();
+    toast(changed.length ? '변경을 요청했습니다 (승인 대기 중)' : '저장했습니다'); EDIT = false; drawMy();
   };
   Actions['pw-change'] = async form => {
     clearErr(form);
@@ -220,19 +239,19 @@
       ${B.anon ? `<div class="wr-anon" role="radiogroup" aria-label="작성자 표시"><span>작성자 표시</span><label><input type="radio" name="nm" value="real"${post && post.anon ? '' : ' checked'}> 이름 공개 (${who})</label><label><input type="radio" name="nm" value="anon"${post && post.anon ? ' checked' : ''}> 익명</label></div>` : ''}
       <div class="ed-wrap">
         <div class="ed-tb" role="toolbar" aria-label="글 꾸미기">
+          <span class="tb-g"><button type="button" class="tb-img" data-action="img-pick" aria-label="사진 넣기" title="사진 넣기"><span class="ms">add_photo_alternate</span><span class="lbl">사진</span></button><input type="file" accept="image/*" multiple hidden data-action="img-file"></span>
           <span class="tb-g"><button type="button" data-action="fmt" data-cmd="bold" aria-label="굵게" title="굵게"><span class="ms">format_bold</span></button>
           <button type="button" data-action="fmt" data-cmd="italic" aria-label="기울임" title="기울임"><span class="ms">format_italic</span></button>
           <button type="button" data-action="fmt" data-cmd="underline" aria-label="밑줄" title="밑줄"><span class="ms">format_underlined</span></button>
           <button type="button" data-action="fmt" data-cmd="strikeThrough" aria-label="취소선" title="취소선"><span class="ms">strikethrough_s</span></button></span>
           <span class="tb-g" aria-label="글자 크기"><button type="button" class="sz s" data-action="fmt-size" data-size="s" aria-label="글자 작게" title="작게">가</button><button type="button" class="sz n" data-action="fmt-size" data-size="n" aria-label="글자 보통" title="보통">가</button><button type="button" class="sz l" data-action="fmt-size" data-size="l" aria-label="글자 크게" title="크게">가</button><button type="button" class="sz xl" data-action="fmt-size" data-size="xl" aria-label="글자 아주 크게" title="아주 크게">가</button></span>
           <span class="tb-g" aria-label="글자 색">${[['ink', '기본'], ['red', '빨강'], ['orange', '주황'], ['green', '초록'], ['blue', '파랑'], ['gray', '회색']].map(c => `<button type="button" class="sw-c c-${c[0]}" data-action="fmt-color" data-color="${c[0]}" aria-label="글자색 ${c[1]}" title="${c[1]}"><i></i></button>`).join('')}</span>
-          <span class="tb-g"><button type="button" class="tb-img" data-action="img-pick" aria-label="사진 넣기" title="사진 넣기"><span class="ms">add_photo_alternate</span><span class="lbl">사진</span></button><input type="file" accept="image/*" multiple hidden data-action="img-file"></span>
         </div>
         <div class="ed" id="ed" contenteditable="true" role="textbox" aria-multiline="true" aria-label="본문" data-placeholder="내용을 입력하세요. 사진은 한 줄에 한 장씩 크게 들어갑니다."></div>
       </div>
       <p class="wr-hint"><span class="ms">info</span>사진은 긴 변 1200px 정도로 줄여 저장됩니다. 붙여넣으면 글자 모양은 지워지고 글자만 들어갑니다. <span data-usage></span></p>
       <p class="field-err" data-err="form" role="alert"></p>
-      <div class="btn-row center"><a class="btn line" href="${post ? 'board-view.html?b=' + board + '&id=' + post.id : back}">취소</a><button class="btn" type="submit">${post ? '수정 저장' : '저장'}</button></div></form>`;
+      <div class="btn-row end"><a class="btn line" href="${post ? 'board-view.html?b=' + board + '&id=' + post.id : back}">취소</a><button class="btn" type="submit">${post ? '수정 완료' : '등록'}</button></div></form>`;
     const ed = $('#ed'); if (post) ed.innerHTML = Store.sanitize(post.html);
     try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
     initEditor(ed); usage();
@@ -327,5 +346,62 @@
     const root = el.closest('[data-cmt-root]'); Store.deleteComment(el.dataset.id); comments(root, root.dataset.board, root.dataset.post); toast('댓글을 삭제했습니다');
   };
 
-  window.Member = { login, join, mypage, write, comments, trial };
+
+  /* ================= 생년월일 휠 피커 (연·월·일을 위아래로 굴려 고름) =================
+     <div data-wheel="birth"> 안의 숨은 input[name=birth] 에 YYYY-MM-DD 로 담긴다. */
+  const WH = 44;   // 한 칸 높이(px) — member.css 의 .wh-col li 높이와 같아야 함
+  const WheelDate = {
+    html(name, value) {
+      return `<div class="wheel${value ? '' : ' untouched'}" data-wheel="${name}"><input type="hidden" name="${name}" value="${esc(value || '')}">
+        <div class="wh-band" aria-hidden="true"></div><div class="wh-cols">${[['y', '연'], ['m', '월'], ['d', '일']].map(c => `<ul class="wh-col" data-col="${c[0]}" role="listbox" tabindex="0" aria-label="${c[1]}"></ul>`).join('')}</div>
+        <p class="wh-hint">위아래로 돌려서 선택하세요</p></div>`;
+    },
+    init(root) { root.querySelectorAll('[data-wheel]').forEach(initWheel); }
+  };
+  function initWheel(w) {
+    const hidden = w.querySelector('input[type=hidden]'), Y1 = new Date().getFullYear();
+    const col = k => w.querySelector(`[data-col="${k}"]`), min = { y: 1920, m: 1, d: 1 };
+    let [y, m, d] = (hidden.value || '1990-01-01').split('-').map(Number);
+    const quiet = () => { w._q = Date.now() + 250; };           // 코드로 굴린 동안은 '선택함'으로 보지 않음
+    const days = () => new Date(y, m, 0).getDate();
+    function fill(k, from, to, unit) {
+      col(k).innerHTML = Array.from({ length: to - from + 1 }, (_, i) => `<li role="option" data-n="${from + i}">${from + i}${unit}</li>`).join('');
+    }
+    function put(k, n, smooth) { const c = col(k); quiet(); c.scrollTo({ top: (n - min[k]) * WH, behavior: smooth ? 'smooth' : 'instant' }); mark(k, n); }
+    function mark(k, n) { col(k).querySelectorAll('li').forEach(li => li.classList.toggle('sel', +li.dataset.n === n)); }
+    const read = k => Math.round(col(k).scrollTop / WH) + min[k];
+    function commit() {
+      const iso = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      hidden.value = iso; w.classList.remove('untouched'); w.dispatchEvent(new Event('wheelchange', { bubbles: true }));
+    }
+    fill('y', min.y, Y1, '년'); fill('m', 1, 12, '월'); fill('d', 1, days(), '일');
+    y = Math.min(Math.max(y, min.y), Y1);
+    put('y', y); put('m', m); put('d', Math.min(d, days()));
+    function settle(k) {
+      const c = col(k), top = c.scrollTop, n = Math.min(Math.max(Math.round(top / WH) + min[k], min[k]), +c.lastElementChild.dataset.n);
+      mark(k, n);
+      if (Date.now() < (w._q || 0)) return;
+      if (k === 'y') y = n; else if (k === 'm') m = n; else d = n;
+      if (k !== 'd') {                                           // 연·월이 바뀌면 그 달의 날짜 수로 다시 채움
+        const max = days(); if (d > max) d = max; fill('d', 1, max, '일'); put('d', d);
+      }
+      commit();
+    }
+    ['y', 'm', 'd'].forEach(k => {
+      const c = col(k); let t = null;
+      c.addEventListener('scroll', () => { mark(k, read(k)); clearTimeout(t); t = setTimeout(() => settle(k), 110); }, { passive: true });
+      c.addEventListener('click', e => { const li = e.target.closest('li'); if (li && !c._drag) { quiet(); w._q = 0; c.scrollTo({ top: (+li.dataset.n - min[k]) * WH, behavior: 'smooth' }); } });
+      c.addEventListener('keydown', e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); w._q = 0; c.scrollBy({ top: e.key === 'ArrowDown' ? WH : -WH, behavior: 'smooth' }); } });
+      /* 마우스(PC)는 끌어서도 굴릴 수 있게 (터치는 기본 스크롤) */
+      c.addEventListener('pointerdown', e => {
+        if (e.pointerType !== 'mouse') return;
+        const y0 = e.clientY, top0 = c.scrollTop; c._drag = false; c.setPointerCapture(e.pointerId); c.style.scrollSnapType = 'none'; c.style.scrollBehavior = 'auto';
+        const mv = ev => { if (Math.abs(ev.clientY - y0) > 4) c._drag = true; c.scrollTop = top0 - (ev.clientY - y0); };
+        const up = () => { c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up); c.style.scrollSnapType = ''; c.style.scrollBehavior = ''; if (c._drag) { w._q = 0; c.scrollTo({ top: Math.round(c.scrollTop / WH) * WH, behavior: 'smooth' }); setTimeout(() => c._drag = false, 60); } };
+        c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+      });
+    });
+  }
+
+  window.Member = { login, join, mypage, write, comments, trial, WheelDate };
 })();

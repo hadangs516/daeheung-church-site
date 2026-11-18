@@ -44,6 +44,7 @@
     write(K.session, { id: u.id });
     return { ok: true, user: u };
   }
+  const usernameTaken = n => users().some(u => u.username.toLowerCase() === String(n).toLowerCase());
   const logout = () => { try { localStorage.removeItem(K.session); } catch (e) {} };
 
   /* 프로필 저장: 사진·자기소개는 바로 반영, 신상 항목은 승인 대기(pending)로 */
@@ -182,6 +183,6 @@
   /* 저장 공간 사용량(대략, KB) — 한도는 브라우저마다 약 5MB */
   function usageKB() { let n = 0; try { Object.values(K).forEach(k => { n += (localStorage.getItem(k) || '').length * 2; }); } catch (e) {} return Math.round(n / 1024); }
 
-  window.Store = { me, signup, login, logout, updateProfile, cancelPending, changePassword, withdraw, resetAll, isAdmin, setAdmin, pendingList, resolvePending,
+  window.Store = { me, usernameTaken, signup, login, logout, updateProfile, cancelPending, changePassword, withdraw, resetAll, isAdmin, setAdmin, pendingList, resolvePending,
     SENS, SENS_LABEL, allPosts, getPost, savePost, deletePost, addView, myPosts, isMine, commentsOf, commentCount, addComment, deleteComment, sanitize, resizeImage, usageKB, today };
 })();
