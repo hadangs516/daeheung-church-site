@@ -46,6 +46,77 @@
     alert(msg, o = {}) { return Modal.open({ title: o.title, body: msg, actions: [{ label: '확인', value: true }] }); }
   };
 
+  /* ===== v3-B: UI 도구 — 점 세 개 메뉴 · 작성자 사진 · 상대 시간 · 신고 ===== */
+  const UI = window.UI = window.UI || {};
+  const mk = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
+  let menuClose = null;
+  /* ⋮ · ⋯ 팝업 메뉴. items: [{label, icon, danger, onClick}] (PC는 버튼 옆 팝업, 휴대폰은 아래에서 올라오는 목록) */
+  UI.menu = (anchor, items) => {
+    if (menuClose) menuClose();
+    items = (items || []).filter(Boolean);
+    const bg = mk('div', 'menu-bg'), pop = mk('div', 'menu-pop'); pop.setAttribute('role', 'menu');
+    pop.innerHTML = items.map((it, i) => it.sep ? '<hr>' : '<button type="button" role="menuitem" class="menu-it' + (it.danger ? ' danger' : '') + '" data-i="' + i + '">' + (it.icon ? '<span class="ms">' + it.icon + '</span>' : '') + '<span>' + escH(it.label) + '</span></button>').join('');
+    const mobile = matchMedia('(max-width:720px)').matches;
+    const close = () => { menuClose = null; document.removeEventListener('keydown', key, true); removeEventListener('resize', close); removeEventListener('scroll', onScroll, true); bg.remove(); anchor && anchor.setAttribute && anchor.setAttribute('aria-expanded', 'false'); anchor && anchor.focus && anchor.focus({ preventScroll: true }); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    const onScroll = e => { if (!pop.contains(e.target)) close(); };
+    bg.addEventListener('click', e => {
+      if (e.target === bg) return close();
+      const b = e.target.closest('.menu-it'); if (!b) return;
+      const it = items[+b.dataset.i]; close(); if (it && it.onClick) it.onClick();
+    });
+    bg.append(pop); document.body.append(bg); menuClose = close;
+    if (anchor && anchor.setAttribute) anchor.setAttribute('aria-expanded', 'true');
+    if (mobile) { bg.classList.add('mob'); requestAnimationFrame(() => bg.classList.add('open')); }
+    else {
+      const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+      let left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8), top = r.bottom + 6;
+      if (top + h > innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
+      pop.style.left = left + 'px'; pop.style.top = top + 'px';
+      addEventListener('resize', close); addEventListener('scroll', onScroll, true);
+    }
+    document.addEventListener('keydown', key, true);
+    const f = pop.querySelector('.menu-it'); f && f.focus({ preventScroll: true });
+    return close;
+  };
+  /* 작성자 사진: 사진이 있으면 사진, 이름만 있으면 머리글자 원, 익명·게스트는 기본 사진 */
+  const AV_COLORS = ['#2d5fb8', '#2f8a4f', '#b8613a', '#7a4fb0', '#1f7f8c', '#a8455f'];
+  UI.avatar = (card, name, cls) => {
+    const c = cls ? ' ' + cls : '';
+    if (card && card.avatar) return '<span class="av' + c + '"><img src="' + escH(card.avatar) + '" alt=""></span>';
+    const n = (card && card.name) || '';
+    if (!n || n === '익명' || n === '게스트') return '<span class="av none' + c + '"><span class="ms">person</span></span>';
+    let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) % 997;
+    return '<span class="av ini' + c + '" style="background:' + AV_COLORS[h % AV_COLORS.length] + '">' + escH([...n][0]) + '</span>';
+  };
+  UI.profileHref = id => 'profile.html?u=' + encodeURIComponent(id);
+  /* id가 있으면 {card, href}, 익명·게스트는 {card:null, href:''} */
+  UI.who = id => { const card = id && window.Store && Store.userCard ? Store.userCard(id) : null; return { card, href: card ? UI.profileHref(card.id) : '' }; };
+  /* 댓글 상대 시간: 방금 → n분 → n시간 → n일(1~6) → n주(7일~한 달 전) → n개월(1~11) → n년 */
+  UI.rel = (at, now) => {
+    now = now || Date.now(); const s = Math.max(0, (now - at) / 1000);
+    if (s < 60) return '방금';
+    if (s < 3600) return Math.floor(s / 60) + '분 전';
+    if (s < 86400) return Math.floor(s / 3600) + '시간 전';
+    const days = Math.floor(s / 86400); if (days < 7) return days + '일 전';
+    const a = new Date(at), b = new Date(now);
+    let mo = (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth();
+    const ann = new Date(a); ann.setMonth(a.getMonth() + mo); if (ann > b) mo--;   // 달력상 한 달이 지났는지
+    if (mo < 1) return Math.floor(days / 7) + '주 전';
+    return mo < 12 ? mo + '개월 전' : Math.floor(mo / 12) + '년 전';
+  };
+  UI.abs = at => { const d = new Date(at), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '.' + p(d.getMonth() + 1) + '.' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+  /* 신고하기: 사유 고르기 → Store.report. o = {kind:'post'|'comment'|'image', id, label, link} */
+  const REASONS = ['광고·홍보 글이에요', '욕설이나 다툼이 있어요', '개인 정보가 나와 있어요', '교회와 관계없는 내용이에요', '기타'];
+  UI.report = o => {
+    let reason = REASONS[0], text = '';
+    const what = { post: '글', comment: '댓글', image: '사진' }[o.kind] || '내용';
+    const p = Modal.open({ title: what + ' 신고하기', body: '<p class="rp-q">어떤 점이 불편하셨나요?</p><div class="rp-list" role="radiogroup">' + REASONS.map((r, i) => '<label class="rp-it"><input type="radio" name="rp" value="' + i + '"' + (i === 0 ? ' checked' : '') + '><span>' + escH(r) + '</span></label>').join('') + '</div><textarea class="rp-text" rows="3" maxlength="200" placeholder="자세한 내용을 적어 주세요 (선택)" aria-label="자세한 내용"></textarea><p class="rp-n">신고 내용은 관리자만 볼 수 있어요.</p>', actions: [{ label: '취소', value: false, kind: 'line' }, { label: '신고하기', value: true }] });
+    const m = document.querySelector('.modal:last-of-type');
+    if (m) { m.addEventListener('change', e => { if (e.target.name === 'rp') reason = REASONS[+e.target.value]; }); m.addEventListener('input', e => { if (e.target.classList.contains('rp-text')) text = e.target.value; }); }
+    return p.then(ok => { if (ok !== true) return false; Store.report({ kind: o.kind, id: o.id, reason, text: text.trim(), link: o.link || (location.pathname.split('/').pop() + location.search), label: o.label || '' }); toast('신고해 주셔서 고맙습니다. 관리자가 확인할게요.', 'info'); return true; });
+  };
+
   /* ---------- 클릭·입력 연결 (data-action) ---------- */
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-action]'); if (!el || /^(INPUT|SELECT|TEXTAREA|FORM)$/.test(el.tagName)) return;
@@ -78,6 +149,7 @@
     }
   };
   const copyText = text => (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).catch(() => { const t = document.createElement('textarea'); t.value = text; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch (er) {} t.remove(); });
+  UI.copy = copyText;
   Actions.share = async el => {
     const title = el.dataset.title || document.title, url = location.href;
     if (navigator.share && matchMedia('(pointer:coarse)').matches) {
@@ -109,16 +181,26 @@
     const lb = document.createElement('div'); lb.className = 'lightbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true');
     const draw = () => {
       lb.innerHTML = '<button class="lb-x" data-lb="close" aria-label="닫기"><span class="ms">close</span></button>' +
+        '<button class="lb-more" data-lb="more" aria-label="사진 메뉴 (저장·공유·신고)" aria-haspopup="menu" aria-expanded="false"><span class="ms">more_horiz</span></button>' +
         (all.length > 1 ? '<button class="lb-nav prev" data-lb="prev" aria-label="이전 사진"><span class="ms">chevron_left</span></button><button class="lb-nav next" data-lb="next" aria-label="다음 사진"><span class="ms">chevron_right</span></button>' : '') +
-        '<img src="' + srcOf(all[i]) + '" alt=""><div class="lb-bar">' + (all.length > 1 ? '<span>' + (i + 1) + ' / ' + all.length + '</span>' : '') +
-        '<a class="btn sm" href="' + srcOf(all[i]) + '" download="photo-' + (i + 1) + '.jpg"><span class="ms">download</span>내려받기</a></div>';
+        '<img src="' + srcOf(all[i]) + '" alt=""><div class="lb-bar">' + (all.length > 1 ? '<span>' + (i + 1) + ' / ' + all.length + '</span>' : '') + '</div>';
     };
-    const key = ev => { if (ev.key === 'Escape') close(); if (ev.key === 'ArrowLeft') go(-1); if (ev.key === 'ArrowRight') go(1); };
+    const busy = () => document.querySelector('.menu-pop,.modal,.sheet-bg');   // 메뉴·확인창이 떠 있으면 사진 창은 가만히
+    const key = ev => { if (busy()) return; if (ev.key === 'Escape') close(); if (ev.key === 'ArrowLeft') go(-1); if (ev.key === 'ArrowRight') go(1); };
     const close = () => { lb.remove(); document.removeEventListener('keydown', key); };
     const go = d => { if (all.length > 1) { i = (i + d + all.length) % all.length; draw(); } };
+    const more = btn => {
+      const src = srcOf(all[i]), ctx = document.querySelector('[data-img-ctx]'), cx = ctx ? ctx.dataset.imgCtx : 'page:' + location.pathname.split('/').pop() + location.search;
+      UI.menu(btn, [
+        { label: '사진 저장', icon: 'download', onClick: () => { const a = document.createElement('a'); a.href = src; a.download = 'photo-' + (i + 1) + '.jpg'; document.body.append(a); a.click(); a.remove(); toast('사진을 저장했습니다'); } },
+        { label: '공유하기', icon: 'share', onClick: () => Actions.share({ dataset: { title: document.title } }) },
+        { sep: true },
+        { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'image', id: cx + '#' + (i + 1), label: (ctx && ctx.dataset.imgLabel || document.title) + ' · 사진 ' + (i + 1) }) }
+      ]);
+    };
     lb.addEventListener('click', ev => {
       const b = ev.target.closest('[data-lb]');
-      if (b) { if (b.dataset.lb === 'close') close(); else go(b.dataset.lb === 'next' ? 1 : -1); } else if (ev.target === lb) close();
+      if (b) { if (b.dataset.lb === 'close') close(); else if (b.dataset.lb === 'more') more(b); else go(b.dataset.lb === 'next' ? 1 : -1); } else if (ev.target === lb) close();
     });
     document.addEventListener('keydown', key); draw(); document.body.append(lb);
   });

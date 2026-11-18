@@ -5,7 +5,7 @@
   const file = (location.pathname.split('/').pop() || 'home.html');
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const MEMBER_PAGES = { 'login.html': ['로그인', 'login'], 'join.html': ['회원가입', 'join'], 'mypage.html': ['마이페이지', 'mypage'] };
+  const MEMBER_PAGES = { 'login.html': ['로그인', 'login'], 'join.html': ['회원가입', 'join'], 'mypage.html': ['마이페이지', 'mypage'], 'profile.html': ['프로필', 'profile'] };
 
   /* 현재 페이지가 어느 메뉴 항목인지 */
   function currentHref() {
@@ -22,19 +22,21 @@
 
   /* ---------- 헤더 + 로그인 영역 ---------- */
   const here = encodeURIComponent(file + location.search);
+  /* 알림함 종 아이콘 (로그인했거나 관리자 모드일 때) — PC는 위 줄 오른쪽 끝, 휴대폰은 ☰ 왼쪽 */
+  const bellBtn = cls => Store.me() ? `<button type="button" class="bell ${cls}" data-action="notif-open" aria-label="알림함" aria-haspopup="dialog" aria-expanded="false"><span class="ms">notifications</span><i class="bell-n" hidden></i></button>` : '';
   function authLinks(mobile) {
     const m = Store.me();
     if (!m) return `<a href="login.html?next=${here}">로그인</a><a href="join.html?next=${here}">회원가입</a>`;
-    return `<span class="who"><b>${esc(m.name)}</b>님</span><a href="mypage.html">마이페이지</a><button type="button" data-action="logout">로그아웃</button>` + (Store.isAdmin() ? '<em class="adm">관리자 모드</em>' : '');
+    return `<span class="who"><b>${esc(m.name)}</b>님</span><a href="mypage.html">마이페이지</a><button type="button" data-action="logout">로그아웃</button>` + (Store.isAdmin() ? '<em class="adm">관리자 모드</em>' : '') + (mobile ? '' : bellBtn('bell-d'));
   }
   const hd = $('#hd');
   if (hd) {
     hd.insertAdjacentHTML('beforebegin', `<div class="hd-top"><div class="wrap">${authLinks()}</div></div>`);
     hd.innerHTML = `<div class="wrap hd-in">
       <a class="logo" href="home.html"><img class="logo-img" src="img/brand/icon-192.png" alt=""><span class="logo-txt">${CHURCH.name}</span></a>
-      <nav class="gnb" id="gnb"><div class="gnb-user">${authLinks()}</div><ul>${MENU.map((g, gi) => `<li class="${gi === curGroup ? 'cur' : ''}"><a href="${g.items[0][1]}">${g.label}</a>
+      <nav class="gnb" id="gnb"><div class="gnb-user">${authLinks(true)}</div><ul>${MENU.map((g, gi) => `<li class="${gi === curGroup ? 'cur' : ''}"><a href="${g.items[0][1]}">${g.label}</a>
         <ul class="sub">${g.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}</a></li>`).join('')}</ul></li>`).join('')}</ul></nav>
-      <button class="burger" id="burger" aria-label="메뉴 열기"><span class="ms">menu</span></button></div>`;
+      <div class="hd-r">${bellBtn('bell-m')}<button class="burger" id="burger" aria-label="메뉴 열기"><span class="ms">menu</span></button></div></div>`;
     const b = $('#burger'), g = $('#gnb');
     b.addEventListener('click', () => { const o = g.classList.toggle('open'); document.body.classList.toggle('lock', o); b.querySelector('.ms').textContent = o ? 'close' : 'menu'; });
     /* 모바일: 상위 메뉴를 누르면 하위 메뉴가 부드럽게 펼쳐지고 접힌다 (높이 애니메이션 + 화살표 회전) */
@@ -47,6 +49,39 @@
     }));
     addEventListener('resize', () => { if (innerWidth > 1024) g.querySelectorAll('.sub').forEach(x => x.style.height = ''); });
   }
+
+  /* ---------- 알림함 ---------- */
+  const NI = { signup: 'person_add', approval: 'verified', group: 'groups', comment: 'chat_bubble', reply: 'reply', bulletin: 'menu_book', notice: 'campaign' };
+  function refreshBells() {
+    const n = Store.me() ? Store.unreadCount() : 0;
+    document.querySelectorAll('.bell').forEach(b => { const i = b.querySelector('.bell-n'); i.hidden = !n; i.textContent = n > 99 ? '99+' : n; b.setAttribute('aria-label', n ? '알림함, 안 읽은 알림 ' + n + '개' : '알림함'); });
+  }
+  refreshBells();
+  addEventListener('storage', refreshBells);
+  Actions['notif-open'] = btn => {
+    if (document.querySelector('.np-bg')) return;
+    const bg = document.createElement('div'), mobile = matchMedia('(max-width:720px)').matches;
+    bg.className = 'np-bg'; bg.innerHTML = '<div class="np" role="dialog" aria-label="알림함"></div>';
+    const np = bg.firstChild;
+    const draw = () => {
+      const L = Store.myNotifs({ unreadOnly: true });
+      np.innerHTML = `<div class="np-hd"><b>알림</b>${L.length ? `<span class="np-n">${L.length}</span>` : ''}<button type="button" class="np-all" data-np="all"${L.length ? '' : ' disabled'}><span class="ms">done_all</span>모두 읽음</button><button type="button" class="np-x" data-np="close" aria-label="닫기"><span class="ms">close</span></button></div>
+        ${L.length ? `<ul class="np-list">${L.map(n => `<li><a class="np-it" href="${esc(n.link || '#')}" data-np-id="${n.id}"><span class="np-ic"><span class="ms">${NI[n.type] || 'notifications'}</span></span><span class="np-t"><b>${esc(n.text)}</b><em title="${UI.abs(n.at)}">${UI.rel(n.at)}</em></span></a></li>`).join('')}</ul>`
+          : '<p class="np-none"><span class="ms">notifications_off</span>새 알림이 없습니다</p>'}
+        <a class="np-more" href="mypage.html#settings">지난 알림 보기</a>`;
+    };
+    const close = () => { document.removeEventListener('keydown', key, true); removeEventListener('resize', close); bg.remove(); btn.setAttribute('aria-expanded', 'false'); refreshBells(); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    bg.addEventListener('click', e => {
+      if (e.target === bg) return close();
+      const a = e.target.closest('[data-np]');
+      if (a) { if (a.dataset.np === 'close') close(); else if (a.dataset.np === 'all') { Store.readAllNotifs(); draw(); refreshBells(); toast('모두 읽음으로 바꿨습니다. 지난 알림은 마이페이지에서 볼 수 있어요.', 'info'); } return; }
+      const it = e.target.closest('[data-np-id]'); if (it) { Store.readNotif(it.dataset.npId); if (!it.getAttribute('href') || it.getAttribute('href') === '#') { e.preventDefault(); draw(); refreshBells(); } }
+    });
+    draw(); document.body.append(bg); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('keydown', key, true);
+    if (mobile) { bg.classList.add('mob'); requestAnimationFrame(() => bg.classList.add('open')); }
+    else { const r = btn.getBoundingClientRect(), w = np.offsetWidth; np.style.top = r.bottom + 8 + 'px'; np.style.left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8) + 'px'; addEventListener('resize', close); }
+  };
 
   /* ---------- 푸터 ---------- */
   const ft = $('#ft');
@@ -160,12 +195,25 @@
     }
     /* 같은 게시판의 다른 글 (현재 글과 가까운 5개) */
     const others = posts.map((x, k) => ({ x, k })).filter(o => o.x.id !== id).sort((a, c) => Math.abs(a.k - i) - Math.abs(c.k - i)).slice(0, 5).sort((a, c) => a.k - c.k).map(o => o.x);
-    C.innerHTML = `<article class="post"><header class="post-hd"><h3>${esc(p.title)}</h3>
-        <button type="button" class="share-btn" data-action="share" data-title="${esc(p.title)}" aria-label="공유"><span class="ms">share</span></button>
-        <p class="post-meta"><span>${esc(p.author)}</span><span>${p.date}</span><span>조회 ${p.views}</span>${B.bulletin ? '' : `<span>댓글 <b data-cmt-count>${p.comments}</b></span>`}${U && U.edited ? '<span>수정됨</span>' : ''}</p></header>
+    /* 작성자 줄 (네이버 블로그처럼): 둥근 사진 + 이름 + 날짜·조회. 회원이면 프로필로 이동, 익명·게스트는 링크 없음 */
+    const who = UI.who(p.authorId), nm = esc(p.author);
+    const byAv = who.href ? `<a class="by-av" href="${who.href}" aria-label="${nm} 프로필 보기">${UI.avatar(who.card, p.author)}</a>` : `<span class="by-av">${UI.avatar(null, p.author)}</span>`;
+    const byNm = who.href ? `<a class="by-name" href="${who.href}">${nm}</a>` : `<span class="by-name">${nm}</span>`;
+    Actions['post-more'] = btn => UI.menu(btn, [
+      canDel && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
+      canDel && { label: '삭제', icon: 'delete', danger: true, onClick: () => Actions['post-del']({ dataset: { id, board: b } }) },
+      (mine || canDel) && { sep: true },
+      { label: '링크 복사', icon: 'link', onClick: () => { UI.copy(location.href); toast('주소를 복사했습니다'); } },
+      { label: '공유하기', icon: 'share', onClick: () => Actions.share({ dataset: { title: p.title } }) },
+      !mine && { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'post', id: b + ':' + id, label: p.title }) }
+    ]);
+    C.innerHTML = `<article class="post" data-img-ctx="post:${b}:${id}" data-img-label="${esc(p.title)}"><header class="post-hd"><h3>${esc(p.title)}</h3>
+        <div class="post-tools"><button type="button" class="share-btn" data-action="share" data-title="${esc(p.title)}" aria-label="공유"><span class="ms">share</span></button>
+        <button type="button" class="more-btn" data-action="post-more" aria-label="글 메뉴" aria-haspopup="menu" aria-expanded="false"><span class="ms">more_vert</span></button></div>
+        <div class="post-by">${byAv}<div class="by-tx">${byNm}<p class="post-meta"><span>${p.date}</span><span>조회 ${p.views}</span>${B.bulletin ? '' : `<span>댓글 <b data-cmt-count>${p.comments}</b></span>`}${U && U.edited ? '<span>수정됨</span>' : ''}</p></div></div></header>
         <div class="post-body">${body}</div></article>
       <div class="post-actions"><span class="pa-l">
-        ${mine ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
+        ${canDel ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
         <a class="btn" href="board.html?b=${b}"><span class="ms">list</span>목록</a></div>
       ${B.bulletin ? '' : '<div id="cmt"></div>'}
       ${others.length ? `<section class="related" aria-label="같은 게시판의 다른 글"><h3 class="rel-h">${B.title}의 다른 글</h3><ul class="rel-list">${others.map(x => `<li><a href="board-view.html?b=${b}&id=${x.id}"><span class="rel-t">${esc(x.title)}${x.comments ? `<span class="cmt-n">(${x.comments})</span>` : ''}</span><span class="rel-m">${esc(x.author)}<i></i>${x.date}</span></a></li>`).join('')}</ul></section>` : ''}`;
@@ -204,7 +252,7 @@
   if (file === 'album-view.html') {
     const k = Math.max(0, ALBUMS.findIndex(x => x.id === +Q.get('a'))), a = ALBUMS[k], prev = ALBUMS[k + 1], next = ALBUMS[k - 1];
     C.innerHTML = `<div class="al-hd"><h3>${a.title}</h3><p>${a.date} · 사진 ${a.photos.length}장</p></div>
-      <ul class="photo-list" data-gallery>${a.photos.map((p, i) => `<li><figure><button type="button" data-view data-src="${p}" aria-label="사진 ${i + 1} 크게 보기"><img src="${p}" alt="${esc(a.title)} 사진 ${i + 1}" loading="lazy"></button><figcaption>${i + 1} / ${a.photos.length}</figcaption></figure></li>`).join('')}</ul>
+      <ul class="photo-list" data-gallery data-img-ctx="album:${a.id}" data-img-label="${esc(a.title)}">${a.photos.map((p, i) => `<li><figure><button type="button" data-view data-src="${p}" aria-label="사진 ${i + 1} 크게 보기"><img src="${p}" alt="${esc(a.title)} 사진 ${i + 1}" loading="lazy"></button><figcaption>${i + 1} / ${a.photos.length}</figcaption></figure></li>`).join('')}</ul>
       <div class="btn-row center">${next ? `<a class="btn line" href="album-view.html?a=${next.id}"><span class="ms">chevron_left</span>이전 앨범</a>` : ''}<a class="btn line" href="album.html">앨범 목록</a>${prev ? `<a class="btn line" href="album-view.html?a=${prev.id}">다음 앨범<span class="ms">chevron_right</span></a>` : ''}</div>`;
   }
 

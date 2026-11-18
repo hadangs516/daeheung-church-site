@@ -42,8 +42,7 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 .burger .ms{font-size:32px}
 
 /* ---------- hero ---------- */
-.hero{position:relative;height:600px;background:url(img/hero-exterior.jpg) center 12%/cover no-repeat;display:flex;align-items:center}
-.hero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.18) 38%,rgba(255,255,255,0) 60%)}
+.hero{position:relative;aspect-ratio:1672/941;height:auto;background:linear-gradient(90deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.18) 38%,rgba(255,255,255,0) 60%),url(img/hero-exterior.jpg) center/cover no-repeat #dfe7ee;display:flex;align-items:center;overflow:hidden}
 .hero-in{position:relative;width:100%}
 .hero-eyebrow{font-size:15px;font-weight:600;letter-spacing:.22em;color:var(--navy-2);margin-bottom:14px}
 .hero-title{font-size:72px;font-weight:800;line-height:1.1;letter-spacing:-.03em;color:var(--navy)}
@@ -173,9 +172,9 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 }
 @media (max-width:720px){
   .wrap{padding:0 20px}
-  .hero{height:440px;background-position:68% center}
-  .hero::before{background:linear-gradient(180deg,rgba(255,255,255,.6) 0%,rgba(255,255,255,.25) 55%,rgba(255,255,255,0) 80%)}
-  .hero-in{align-self:flex-start;padding-top:56px}
+  .hero{display:block;aspect-ratio:auto;height:auto;background:#dfe7ee}
+  .hero::before{content:"";display:block;aspect-ratio:1672/941;background:url(img/hero-exterior.jpg) center/cover no-repeat}
+  .hero-in{padding-top:28px;padding-bottom:40px}
   .hero-eyebrow{font-size:12px;margin-bottom:8px}
   .hero-title{font-size:44px}
   .hero-title::after{margin:18px 0 16px;width:44px}
