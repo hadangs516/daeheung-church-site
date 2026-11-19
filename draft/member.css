@@ -144,7 +144,8 @@
 .ed{min-height:360px;padding:22px;border:1px solid #cfd5e2;border-top:0;border-radius:0 0 var(--radius) var(--radius);background:#fff;outline:0}
 .ed:focus{border-color:var(--navy)}
 .ed:empty::before{content:attr(data-placeholder);color:#9aa0ad}
-.wr-hint{display:flex;gap:6px;align-items:flex-start;margin-top:10px;font-size:0.90625rem;color:var(--muted);line-height:1.5}
+.wr-hint{display:block;margin-top:10px;font-size:0.90625rem;color:var(--muted);line-height:1.5}
+.wr-hint [data-usage]{display:block;margin-top:4px}
 .wr-hint .ms{font-size:1.125rem;flex:none}
 
 /* ---------- 글 아래 버튼 · 댓글 · 다른 글 ---------- */
