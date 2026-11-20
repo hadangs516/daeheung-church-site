@@ -48,6 +48,7 @@
 
   /* ===== v3-B: UI 도구 — 점 세 개 메뉴 · 작성자 사진 · 상대 시간 · 신고 ===== */
   const UI = window.UI = window.UI || {};
+  UI.hiddenBadge = post => post.hidden ? '<em class="post-hidden">숨김</em>' : '';
   const mk = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
   let menuClose = null;
   /* ⋮ · ⋯ 팝업 메뉴. items: [{label, icon, danger, onClick}] (PC는 버튼 옆 팝업, 휴대폰은 아래에서 올라오는 목록) */

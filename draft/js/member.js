@@ -68,11 +68,11 @@
   const birthHtml = v => {
     const [y, m, d] = (v || '').split('-').map(Number);
     const i = (n, ph, len, val, unit) => `<label class="bi bi-${n}"><input name="b${n}" inputmode="numeric" pattern="[0-9]*" maxlength="${len}" placeholder="${ph}" value="${val || ''}" autocomplete="off" data-oninput="birth-key"${n === 'y' ? ' data-focus="birth"' : ''} aria-label="태어난 ${unit}"><span>${unit}</span></label>`;
-    return `<div class="birth-in" role="group">${i('y', '1950', 4, y, '년')}${i('m', '3', 2, m, '월')}${i('d', '15', 2, d, '일')}<input type="hidden" name="birth" value="${esc(v || '')}"></div>`;
+    return `<div class="birth-in" role="group">${i('y', '1951', 4, y, '년')}${i('m', '4', 2, m, '월')}${i('d', '1', 2, d, '일')}<input type="hidden" name="birth" value="${esc(v || '')}"></div>`;
   };
   function readBirth(form) {
     const y = +form.by.value, m = +form.bm.value, d = +form.bd.value, now = new Date();
-    let ok = y >= 1900 && y <= now.getFullYear() && m >= 1 && m <= 12 && d >= 1 && d <= new Date(y, m, 0).getDate();
+    let ok = y >= 1850 && y <= now.getFullYear() && m >= 1 && m <= 12 && d >= 1 && d <= new Date(y, m, 0).getDate();
     if (ok && new Date(y, m - 1, d) > now) ok = false;
     const iso = ok ? y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0') : '';
     form.birth.value = iso; return iso;
@@ -80,9 +80,13 @@
   Actions['birth-key'] = el => {
     el.value = el.value.replace(/\D/g, '');
     const f = el.form, next = { by: 'bm', bm: 'bd' }[el.name];
+    if (f.dataset.action === 'join') {
+      const birth = readBirth(f);
+      f.querySelector('[data-err="birth"]').textContent = birth ? Store.signupBirthError(birth) : '';
+    }
     if (next && (el.value.length >= el.maxLength || (el.name === 'bm' && +el.value > 1))) f[next].focus();
   };
-  const BIRTH_ERR = '생년월일을 숫자로 입력해 주세요. (예: 1950년 3월 15일)';
+  const BIRTH_ERR = '생년월일을 숫자로 입력해 주세요. (예: 1951년 4월 1일)';
   /* 소속: 선택 창(Affil.open)에서 고른 결과를 칩으로 보여 줌. 상태는 요소의 data-sel 에 JSON 으로 담는다 */
   const affBlock = (sel, orig) => `<div class="fld"><span class="fld-l">소속 <i class="opt">(선택 · 없으면 그대로 두세요)</i></span>
       <div class="aff" data-aff data-sel="${esc(JSON.stringify(sel.map(g => ({ id: g.id, role: g.role }))))}" data-orig="${esc(JSON.stringify(orig || []))}"><div class="aff-chips"></div>
@@ -105,7 +109,47 @@
   };
   const parishOpts = sel => '<option value="">모르겠어요 · 아직 없어요</option>' + Store.PARISHES.map(p => `<option value="${p.id}"${p.id === sel ? ' selected' : ''}>${p.name}</option>`).join('');
 
+  const bioField = (hint, value = '') => field('자기소개 <i class="opt">' + hint + '</i>', `<textarea name="bio" rows="3" maxlength="200" placeholder="간단히 자신을 소개해 주세요 (200자)">${esc(value)}</textarea>`, 'bio');
+
   /* ================= 회원가입 ================= */
+  const consentItems = [
+    { key: 'age', label: '만 14세 이상입니다',
+      body: '<p>저는 만 14세 이상입니다. 만 14세 미만은 이 홈페이지에 가입할 수 없습니다.</p>' },
+    { key: 'terms', label: '이용약관에 동의합니다', page: 'terms.html', title: '이용약관',
+      body: '<p>포항대흥교회 홈페이지 이용약관(게시물 신고·숨김·삭제, 게스트 글과 익명 댓글, 포토앨범 운영 포함)에 동의합니다.</p>' },
+    { key: 'privacy', label: '개인정보 수집·이용에 동의합니다', page: 'privacy.html', title: '개인정보 처리방침',
+      body: '<p><strong>수집 항목</strong>: 이름, 아이디, 비밀번호, 생년월일, 직분, 소속(부서), 교구</p><p><strong>이용 목적</strong>: 회원 확인과 관리자 승인, 로그인, 만 14세 미만 가입 제한, 교인 간 소통과 부서·교구별 안내, 게시판·앨범 운영과 신고 처리</p><p><strong>보유 기간</strong>: 회원 탈퇴 즉시 파기. 다만 재가입 방지를 위해 탈퇴 후 <strong>45일</strong> 동안 아이디·이름·생년월일·이용 제한 사유만 보관합니다.</p><p>동의하지 않을 수 있으나, 동의하지 않으면 가입할 수 없습니다.</p>' },
+    { key: 'sensitive', label: '민감정보(종교 관련 정보) 처리에 동의합니다',
+      body: '<p>직분, 소속(부서), 교구는 제가 교인임을 드러내는 종교 관련 정보(민감정보)입니다.</p><p><strong>이용 목적</strong>: 교인 확인과 교인 간 소통, 부서·교구별 안내</p><p><strong>보유 기간</strong>: 회원 탈퇴 즉시 파기</p><p><strong>공개 범위</strong>: 마이페이지에서 항목별로 직접 고릅니다(전체 공개 / 로그인 회원만 / 비공개).</p><p>동의하지 않을 수 있으나, 동의하지 않으면 가입할 수 없습니다.</p>' },
+    { key: 'phone', label: '휴대폰 번호 수집·이용에 동의합니다',
+      body: '<p><strong>수집 항목</strong>: 휴대폰 번호</p><p><strong>이용 목적</strong>: 교회·부서의 연락</p><p><strong>보유 기간</strong>: 회원 탈퇴 즉시 파기</p><p>동의하지 않아도 가입할 수 있습니다.</p>' }
+  ];
+  function consentBlock() {
+    const check = (key, label, required) => `<label><input type="checkbox" name="agree-${key}" data-action="join-consent"${required ? ' required' : ''}><span>${label}</span></label>`;
+    return `<fieldset class="join-consent"><legend>가입 동의</legend>
+      <div class="consent-all">${check('all', '전체 동의 (선택 항목 포함)', false)}</div>
+      ${consentItems.map(({ key, label, page, title, body }) => `<div class="consent-row">
+        ${check(key, (key === 'phone' ? '(선택) ' : '(필수) ') + label, key !== 'phone')}
+        ${page ? `<a class="consent-more" href="${page}" target="_blank" rel="noopener" aria-label="${title} 전문 보기 (새 창)">전문 보기</a><div class="consent-copy">${body}</div>`
+          : `<button class="consent-more" type="button" data-action="consent-read" data-key="${key}" aria-label="${label} · ${key === 'age' ? '안내' : '전문'} 보기">${key === 'age' ? '안내' : '전문'} 보기</button>`}</div>`).join('')}
+      <p class="field-err" data-err="consent" role="alert"></p></fieldset>`;
+  }
+  const readConsent = form => Object.fromEntries(consentItems.map(({ key }) => [key, form.elements['agree-' + key].checked]));
+  function syncConsent(form) {
+    const consent = readConsent(form);
+    form.elements['agree-all'].checked = Object.values(consent).every(Boolean);
+    form.phone.disabled = !consent.phone;
+    if (!consent.phone) form.phone.value = '';
+    form.querySelector('[type=submit]').disabled = !Store.hasRequiredConsents(consent);
+  }
+  Actions['join-consent'] = el => {
+    if (el.name === 'agree-all') consentItems.forEach(({ key }) => { el.form.elements['agree-' + key].checked = el.checked; });
+    syncConsent(el.form);
+  };
+  Actions['consent-read'] = el => {
+    const item = consentItems.find(({ key }) => key === el.dataset.key);
+    Modal.alert('<div class="consent-copy">' + item.body + '</div>', { title: item.label });
+  };
   function join(C) {
     if (Store.me()) { location.replace('mypage.html'); return; }
     C.innerHTML = `<div class="mb-card">${trial('시험판에서는 가입하면 바로 로그인되고, 관리자가 승인하기 전까지 “승인 대기 중”으로 보입니다.')}
@@ -118,14 +162,19 @@
         ${field('직분', `<select name="rank"><option value="">선택해 주세요</option>${rankOpts('')}</select>`, 'rank')}
         ${affBlock([])}
         ${field('교구 <i class="opt">(선택)</i>', `<select name="parish">${parishOpts('')}</select>`, 'parish', '교구장님이 확인하면 승인됩니다.')}
-        ${field('휴대폰 <i class="opt">(선택)</i>', '<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000" data-oninput="phone-fmt">', 'phone')}
+        ${field('휴대폰 <i class="opt">(선택)</i>', '<input name="phone" type="tel" inputmode="tel" autocomplete="tel" disabled placeholder="010-0000-0000" data-oninput="phone-fmt">', 'phone', '아래에서 휴대폰 번호 수집·이용에 동의하면 입력할 수 있습니다.')}
+        ${bioField('(선택)')}
+        ${consentBlock()}
         <p class="field-err" data-err="form" role="alert"></p>
-        <button class="btn block" type="submit">가입하고 로그인</button>
+        <button class="btn block" type="submit" disabled>가입 신청</button>
       </form>
       <div class="mb-links"><span>이미 계정이 있나요?</span><a href="login.html${location.search}">로그인</a></div></div>`;
     affInit(C);
+    syncConsent(C.querySelector('form'));
   }
   Actions.join = async form => {
+    const checks = form.querySelector('.join-consent');
+    if (checks.disabled) return;
     clearErr(form);
     const v = k => form[k].value.trim(), pw = form.password.value;
     if (v('name').length < 2) return setErr(form, 'name', '이름을 2자 이상 입력해 주세요.');
@@ -133,14 +182,20 @@
     if (pw.length < 4) return setErr(form, 'password', '4자 이상 입력해 주세요.');
     if (pw !== form.password2.value) return setErr(form, 'password2', '비밀번호가 서로 다릅니다. 다시 확인해 주세요.');
     const birth = readBirth(form); if (!birth) return setErr(form, 'birth', BIRTH_ERR);
+    const birthError = Store.signupBirthError(birth);
+    if (birthError) return setErr(form, 'birth', birthError);
+    const consent = readConsent(form);
+    if (!Store.hasRequiredConsents(consent)) return setErr(form, 'consent', '필수 항목에 모두 동의해 주세요.');
     if (!form.rank.value) return setErr(form, 'rank', '직분을 선택해 주세요.');
-    if (v('phone') && !/^01\d[-\s]?\d{3,4}[-\s]?\d{4}$/.test(v('phone'))) return setErr(form, 'phone', '휴대폰 번호 형식이 맞지 않습니다. (예: 010-0000-0000)');
+    const phone = consent.phone ? v('phone') : '';
+    if (phone && !/^01\d[-\s]?\d{3,4}[-\s]?\d{4}$/.test(phone)) return setErr(form, 'phone', '휴대폰 번호 형식이 맞지 않습니다. (예: 010-0000-0000)');
     busy(form, true);
+    checks.disabled = true;
     try {
-      const r = await Store.signup({ name: v('name'), username: v('username'), password: pw, birth, rank: form.rank.value, phone: v('phone'), groups: affGet(form), parish: form.parish.value });
-      if (!r.ok) { busy(form, false); return setErr(form, r.field || 'form', r.error); }
+      const r = await Store.signup({ name: v('name'), username: v('username'), password: pw, birth, rank: form.rank.value, phone, consent, bio: v('bio'), groups: affGet(form), parish: form.parish.value });
+      if (!r.ok) { checks.disabled = false; syncConsent(form); return setErr(form, r.field || 'form', r.error); }
       toastLater(r.user.name + '님, 가입되었습니다 (관리자 승인 전까지 “승인 대기 중”으로 보입니다)'); location.href = safeNext(Q.get('next'));
-    } catch (e) { busy(form, false); setErr(form, 'form', e.message); }
+    } catch (e) { checks.disabled = false; syncConsent(form); setErr(form, 'form', e.message); }
   };
 
   Actions['pw-toggle'] = el => { const i = el.parentElement.querySelector('input'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.querySelector('.ms').textContent = show ? 'visibility_off' : 'visibility'; el.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기'); };
@@ -156,12 +211,14 @@
 
   /* ================= 마이페이지 =================
      화면 이동은 주소의 # 로: #info(내 정보) #activity(내 활동) #approve(승인 관리: 관리자·대표만)
-     #account(계정 설정) #settings/privacy|notif|view|leave(설정) */
-  let TAB = 'info', SUB = 'privacy', ACT = 'all';
+     #settings 및 #settings/<항목> */
+  const settingsTitles = { profile: '내 정보 수정', password: '비밀번호 변경', privacy: '공개 범위', notif: '알림', view: '화면', leave: '탈퇴하기' };
+  let TAB = 'info', SUB = '', ACT = 'all';
   function route() {
-    const h = (location.hash || '').slice(1).split('/'); TAB = h[0] || 'info'; if (TAB === 'edit') TAB = 'account';
-    if (!['info', 'activity', 'approve', 'account', 'settings'].includes(TAB)) TAB = 'info';
-    if (TAB === 'settings') SUB = ['privacy', 'notif', 'view', 'leave'].includes(h[1]) ? h[1] : 'notif';   // #settings 만 오면 알림(지난 알림)
+    if (['#account', '#edit'].includes(location.hash)) history.replaceState(null, '', '#settings/profile');
+    const [tab, sub] = location.hash.slice(1).split('/');
+    TAB = ['info', 'activity', 'approve', 'settings'].includes(tab) ? tab : 'info';
+    SUB = TAB === 'settings' && Object.keys(settingsTitles).includes(sub) ? sub : '';
   }
   function mypage(C) {
     if (!Store.me()) { location.replace('login.html?next=mypage.html'); return; }
@@ -185,11 +242,10 @@
     const admin = Store.isAdmin(), cnt = (admin || Store.isLeader()) ? approveCount() : 0;
     const tabs = [['info', '내 정보'], ['activity', '내 활동']].concat(admin || Store.isLeader() ? [['approve', '승인 관리' + (cnt ? ' (' + cnt + ')' : '')]] : []);
     if (TAB === 'approve' && tabs.length < 3) TAB = 'info';
-    const on = (TAB === 'account' || TAB === 'settings') ? 'info' : TAB;
     const aff = Store.groupText && (u.groups || []).filter(g => g.status === 'approved').map(g => Store.groupText(g));
     C.innerHTML = `<div class="mp">
       <aside class="mp-side"><div class="mp-me">${avatar(u)}<div class="mp-me-t"><b>${esc(u.name)}</b><span>${esc(u.rank)}${aff.length ? ' · ' + esc(aff.join(' · ')) : ''}</span>${badgeHtml(u)}</div></div></aside>
-      <section class="mp-main"><div class="tabs" role="tablist">${tabs.map(t => `<a href="#${t[0]}" role="tab" data-action="mp-tab" data-tab="${t[0]}"${t[0] === on ? ' class="on" aria-selected="true"' : ''}>${t[1]}</a>`).join('')}</div>
+      <section class="mp-main">${TAB === 'settings' ? '' : `<div class="tabs" role="tablist">${tabs.map(t => `<a href="#${t[0]}" role="tab" data-action="mp-tab" data-tab="${t[0]}"${t[0] === TAB ? ' class="on" aria-selected="true"' : ''}>${t[1]}</a>`).join('')}</div>`}
         <div class="mp-panel" data-panel="${TAB}">${panel(u)}</div></section>
       <aside class="mp-test" aria-label="시험용 도구"><p class="mp-test-t"><span class="ms">science</span>시험용 도구</p>
         <label class="switch"><input type="checkbox" role="switch" data-action="admin-toggle"${admin ? ' checked' : ''}><span class="sw"></span><span class="sw-t">시험용 관리자 모드</span></label>
@@ -202,17 +258,16 @@
   function panel(u) {
     if (TAB === 'activity') return panelActivity();
     if (TAB === 'approve') return panelApprove();
-    if (TAB === 'account') return back + panelAccount(u);
-    if (TAB === 'settings') return back + panelSettings(u);
+    if (TAB === 'settings') return panelSettings(u);
     /* 내 정보 (보기 화면) */
     const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
     const notice = (Store.statusOf(u) === 'pending' ? `<div class="pend-box"><div><b><span class="ms">hourglass_top</span>가입 승인 대기 중</b><p>관리자가 확인하면 승인됩니다. 그 전에도 홈페이지는 그대로 이용하실 수 있습니다.</p></div></div>`
       : Store.statusOf(u) === 'rejected' ? `<div class="pend-box"><div><b><span class="ms">info</span>가입 승인이 아직 되지 않았어요</b><p>교회 사무실에 문의해 주세요.</p></div></div>` : '') + pendBox(u);
     return `${notice}<div class="mp-view"><div class="mp-photo">${avatar(u)}<div class="mp-v-id"><b class="mp-v-name">${esc(u.name)}</b><span class="mp-v-rank">${esc(u.rank)}</span>
         <a class="mp-prof" href="profile.html?u=${u.id}">내 프로필 보기<span class="ms">chevron_right</span></a></div>
-        <div class="mp-v-btns"><button type="button" class="btn sm line" data-action="mp-tab" data-tab="account"><span class="ms">manage_accounts</span>계정 설정</button><button type="button" class="btn sm line" data-action="mp-tab" data-tab="settings/privacy"><span class="ms">settings</span>설정</button></div></div>
+        <div class="mp-v-btns"><button type="button" class="mp-gear" data-action="mp-tab" data-tab="settings" aria-label="설정"><span class="ms" aria-hidden="true">settings</span></button></div></div>
         <dl class="info mp-dl">${row('이름', esc(u.name))}${row('직분', esc(u.rank))}${row('소속', groupChips(u))}${row('교구', parishText(u))}${row('생년월일', fmtBirth(u.birth))}${row('연락처', esc(u.phone) || '(없음)')}${row('자기소개', u.bio ? esc(u.bio).replace(/\n/g, '<br>') : '<span class="muted">(아직 없습니다)</span>')}</dl>
-        <div class="mp-logout"><button type="button" class="btn line" data-action="logout"><span class="ms">logout</span>로그아웃</button></div></div>`;
+        </div>`;
   }
   function pendBox(u) {
     if (!u.pending) return '';
@@ -222,32 +277,32 @@
 
   /* ---------- 내 활동: 내가 쓴 글·댓글·답글 (최신순) ---------- */
   function panelActivity() {
-    const items = Store.myPosts().map(p => ({ kind: 'post', at: p.at, board: p.board, title: p.title, href: `board-view.html?b=${p.board}&id=${p.id}`, p }))
-      .concat((Store.myComments ? Store.myComments() : []).map(c => ({ kind: c.isReply ? 'reply' : 'comment', at: c.at, board: c.board, title: c.postTitle, text: c.text, href: `board-view.html?b=${c.board}&id=${c.postId}` })))
+    const items = Store.myPosts().map(p => ({ kind: 'post', at: p.at, board: p.board, title: p.title, hidden: p.hidden, href: `board-view.html?b=${p.board}&id=${p.id}`, p }))
+      .concat((Store.myComments ? Store.myComments() : []).map(c => ({ kind: c.isReply ? 'reply' : 'comment', at: c.at, board: c.board, title: c.postTitle, text: c.text, hidden: c.hidden, href: Store.commentHref(c.board, c.postId, c.id) })))
       .sort((a, b) => b.at - a.at);
     const n = k => items.filter(i => i.kind === k).length;
     const seg = [['all', '전체', items.length], ['post', '글', n('post')], ['comment', '댓글', n('comment')], ['reply', '답글', n('reply')]];
     const list = ACT === 'all' ? items : items.filter(i => i.kind === ACT);
     const KL = { post: '글', comment: '댓글', reply: '답글' };
     return `<div class="seg act-seg" role="tablist">${seg.map(s => `<button type="button" role="tab" data-action="act-filter" data-k="${s[0]}"${s[0] === ACT ? ' class="on" aria-selected="true"' : ''}>${s[1]} ${s[2]}</button>`).join('')}</div>` +
-      (list.length ? `<ul class="my-list act-list">${list.map(i => `<li><div class="act-main"><span class="act-k k-${i.kind}">${KL[i.kind]}</span><span class="my-b">${esc((BOARDS[i.board] || {}).title || i.board)}</span>
-        <a href="${i.href}">${esc(i.title)}</a>${i.text ? `<p class="act-t">${esc(i.text).replace(/\n/g, '<br>')}</p>` : ''}<span class="my-d">${dotDate(i.at)}${i.p && i.p.anon ? ' · 익명' : ''}</span></div>
+      (list.length ? `<ul class="my-list act-list">${list.map(i => `<li><div class="act-main"><span class="act-k k-${i.kind}">${KL[i.kind]}</span><span class="my-b">${esc(i.board === 'album' ? '포토앨범' : (BOARDS[i.board] || {}).title || i.board)}</span>
+        <a href="${i.href}">${esc(i.title)}${UI.hiddenBadge(i)}</a>${i.text ? `<p class="act-t">${esc(i.text).replace(/\n/g, '<br>')}</p>` : ''}<span class="my-d">${dotDate(i.at)}${i.p && i.p.anon ? ' · 익명' : ''}</span></div>
         ${i.p ? `<div class="my-act"><a class="btn sm line" href="write.html?b=${i.board}&edit=${i.p.id}">수정</a><button type="button" class="btn sm line" data-action="post-del" data-id="${i.p.id}" data-board="${i.board}" data-back="mypage.html#activity">삭제</button></div>` : ''}</li>`).join('')}</ul>`
         : `<p class="empty">${ACT === 'all' ? '아직 쓴 글이나 댓글이 없습니다.' : '아직 없습니다.'}<br><a class="btn sm" style="margin-top:16px" href="write.html?b=freeboard">자유게시판에 글쓰기</a></p>`);
   }
   Actions['act-filter'] = el => { ACT = el.dataset.k; drawMy(); };
 
-  /* ---------- 계정 설정: 정보 수정 + 비밀번호 변경 ---------- */
-  function panelAccount(u) {
+  /* ---------- 내 정보 수정 ---------- */
+  function panelProfile(u) {
     const p = u.pending || {}, val = k => (k in p ? p[k] : u[k]);
     const need = '<span class="need-ok"><span class="ms">verified_user</span>변경 시 교회 승인 필요</span>';
     const wait = k => k in p ? `<p class="fld-w"><span class="ms">hourglass_top</span>승인 대기 중 · 지금 표시되는 정보: ${esc(u[k] || '(없음)')}</p>` : '';
-    return `<h3 class="mp-h">계정 설정</h3>${pendBox(u)}<form class="mb-form wide" data-action="profile-save" novalidate>
+    return `${pendBox(u)}<form class="mb-form wide" data-action="profile-save" novalidate>
         <div class="mp-photo">${avatar(u)}<div><p class="fld-l">프로필 사진 <i class="opt">바로 반영</i></p>
           <button type="button" class="btn sm line" data-action="photo-pick"><span class="ms">photo_camera</span>사진 변경</button>
           ${u.photo ? '<button type="button" class="btn sm line" data-action="photo-clear">삭제</button>' : ''}
           <input type="file" accept="image/*" hidden data-action="photo-file"></div></div>
-        ${field('자기소개 <i class="opt">바로 반영</i>', `<textarea name="bio" rows="3" maxlength="200" placeholder="간단히 자신을 소개해 주세요 (200자)">${esc(u.bio)}</textarea>`, 'bio')}
+        ${bioField('바로 반영', u.bio)}
         <div class="fld-grid">
         <div>${field('이름 ' + need, `<input name="name" maxlength="20" value="${esc(val('name'))}">`, 'name')}${wait('name')}</div>
         <div>${field('직분 ' + need, `<select name="rank">${rankOpts(val('rank'))}</select>`, 'rank')}${wait('rank')}</div>
@@ -256,20 +311,38 @@
         ${affBlock((u.groups || []).map(g => ({ id: g.id, role: g.role })), u.groups)}
         ${field('교구 <i class="opt">(선택)</i>', `<select name="parish">${parishOpts(u.parish && u.parish.id)}</select>`, 'parish', '바꾸면 교구장님의 승인이 다시 필요합니다.')}
         <p class="field-err" data-err="form" role="alert"></p>
-        <div class="btn-row end"><button type="button" class="btn line" data-action="mp-tab" data-tab="info">취소</button><button class="btn" type="submit">저장</button></div></form>
-      <h3 class="mp-h mp-h2">비밀번호 변경</h3><form class="mb-form wide" data-action="pw-change" novalidate>
+        <div class="btn-row end"><button type="button" class="btn line" data-action="mp-tab" data-tab="settings">취소</button><button class="btn" type="submit">저장</button></div></form>`;
+  }
+  function panelPassword() {
+    return `<form class="mb-form wide" data-action="pw-change" novalidate>
         ${field('현재 비밀번호', pwf('cur', 'current-password'), 'cur')}
         ${field('새 비밀번호', pwf('next', 'new-password', true), 'next', '4자 이상 쓰시면 됩니다')}
         ${field('새 비밀번호 확인', pwf('next2', 'new-password'), 'next2')}
         <p class="field-err" data-err="form" role="alert"></p><div class="btn-row end"><button class="btn" type="submit">비밀번호 변경</button></div></form>`;
   }
 
-  /* ---------- 설정: 공개 범위 · 알림 · 화면 · 탈퇴 ---------- */
+  /* ---------- 설정 목록 및 항목별 화면 ---------- */
+  function settingsIndex() {
+    const icon = name => `<span class="ms" aria-hidden="true">${name}</span>`;
+    const arrow = icon('chevron_right');
+    const category = (key, symbol) => `<button type="button" class="set-row${key === 'leave' ? ' danger-t' : ''}" data-action="set-sub" data-k="${key}">${icon(symbol)}<span>${settingsTitles[key]}</span>${arrow}</button>`;
+    const link = (url, label, symbol) => `<a class="set-row" href="${url}">${icon(symbol)}<span>${label}</span>${arrow}</a>`;
+    const section = (title, rows) => `<section class="set-group"><h4>${title}</h4>${rows}</section>`;
+    return back + '<h3 class="mp-h">설정</h3>' +
+      section('계정', category('profile', 'manage_accounts') + category('password', 'lock')) +
+      section('개인정보', category('privacy', 'visibility')) +
+      section('알림', category('notif', 'notifications')) +
+      section('화면', category('view', 'display_settings')) +
+      section('기타', link('privacy.html', '개인정보 처리방침', 'policy') + link('terms.html', '이용약관', 'description') +
+        `<div class="set-row">${icon('info')}<span>앱 버전</span><small>v${APP_VERSION}</small></div>
+         <button type="button" class="set-row" data-action="logout">${icon('logout')}<span>로그아웃</span>${arrow}</button>` + category('leave', 'person_remove'));
+  }
   function panelSettings(u) {
-    const subs = [['privacy', '공개 범위'], ['notif', '알림'], ['view', '화면·기타'], ['leave', '탈퇴']];
-    const seg = `<div class="seg set-seg" role="tablist">${subs.map(s => `<button type="button" role="tab" data-action="set-sub" data-k="${s[0]}"${s[0] === SUB ? ' class="on" aria-selected="true"' : ''}>${s[1]}</button>`).join('')}</div>`;
-    let h = '';
-    if (SUB === 'privacy') {
+    if (!SUB) return settingsIndex();
+    let h;
+    if (SUB === 'profile') h = panelProfile(u);
+    else if (SUB === 'password') h = panelPassword();
+    else if (SUB === 'privacy') {
       const pv = Store.privOf(u);
       h = `<p class="set-lead">내 정보를 누구에게 보여 줄지 정해요. 이름과 사진은 글을 쓸 때 항상 보입니다.</p><ul class="set-list">${Store.PRIV_FIELDS.map(([k, l]) => `<li><label for="pv-${k}">${l}</label>
           <select id="pv-${k}" data-action="priv-set" data-key="${k}">${Object.keys(Store.PRIV_LABEL).map(v => `<option value="${v}"${pv[k] === v ? ' selected' : ''}>${Store.PRIV_LABEL[v]}</option>`).join('')}</select></li>`).join('')}</ul>
@@ -289,9 +362,9 @@
         <label class="chk"><input type="checkbox" id="leave-del"><span><b>내 글·댓글도 모두 지우기</b><i>체크하지 않으면 쓴 글과 댓글은 그대로 남습니다. (작성자 이름만 남아요)</i></span></label>
         <button type="button" class="btn danger" data-action="withdraw">탈퇴하기</button></div>`;
     }
-    return `<h3 class="mp-h">설정</h3>${seg}<div class="set-body">${h}</div>`;
+    return `<a class="mp-back" href="#settings"><span class="ms" aria-hidden="true">arrow_back</span>설정</a><h3 class="mp-h">${settingsTitles[SUB]}</h3><div class="set-body">${h}</div>`;
   }
-  Actions['set-sub'] = el => { SUB = el.dataset.k; history.replaceState(null, '', '#settings/' + SUB); drawMy(); };
+  Actions['set-sub'] = el => { location.hash = 'settings/' + el.dataset.k; };
   Actions['priv-set'] = el => { Store.setPrivacy(el.dataset.key, el.value); toast('공개 범위를 바꿨습니다'); };
   Actions['notif-pref'] = el => { Store.setNotifPref(el.dataset.type, el.checked); toast(el.checked ? '이 알림을 켰습니다' : '이 알림을 껐습니다'); };
   Actions['nh-go'] = el => { if (Store.readNotif) Store.readNotif(el.dataset.id); };
@@ -409,7 +482,7 @@
         ${F.bio ? `<p class="pf-bio">${esc(F.bio).replace(/\n/g, '<br>')}</p>` : ''}
         <dl class="info mp-dl pf-dl">${row('직분', 'position' in F ? esc(F.position) : '')}${row('소속', 'groups' in F ? chips(F.groups) : '')}${row('교구', 'parish' in F ? chips(F.parish) : '')}${row('생년월일', 'birth' in F ? fmtBirth(F.birth) : '')}${row('연락처', 'phone' in F ? esc(F.phone) : '')}</dl>
         ${p.self ? '<p class="fld-h pf-note"><span class="ms">info</span>내가 보는 화면이라 모든 정보가 보입니다. 다른 분에게는 공개 범위에 맞춰 보입니다.</p>' : (!Store.me() && p.needLogin) ? '<p class="fld-h pf-note"><span class="ms">lock</span>로그인하면 더 많은 정보를 볼 수 있어요.</p>' : ''}</section>
-      <section class="pf-posts"><h3 class="mp-h">쓴 글 <b>${posts.length}</b></h3>${posts.length ? `<ul class="my-list">${posts.map(x => `<li><div><span class="my-b">${esc((BOARDS[x.board] || {}).title || x.board)}</span><a href="board-view.html?b=${x.board}&id=${x.id}">${esc(x.title)}</a><span class="my-d">${x.date}</span></div></li>`).join('')}</ul>` : '<p class="empty" style="padding:44px 0">아직 쓴 글이 없습니다.</p>'}</section></div>`;
+      <section class="pf-posts"><h3 class="mp-h">쓴 글 <b>${posts.length}</b></h3>${posts.length ? `<ul class="my-list">${posts.map(x => `<li><div><span class="my-b">${esc((BOARDS[x.board] || {}).title || x.board)}</span><a href="board-view.html?b=${x.board}&id=${x.id}">${esc(x.title)}${UI.hiddenBadge(x)}</a><span class="my-d">${x.date}</span></div></li>`).join('')}</ul>` : '<p class="empty" style="padding:44px 0">아직 쓴 글이 없습니다.</p>'}</section></div>`;
   }
   /* profile.html 은 site.js 의 틀 목록에 없어도 열리도록, 필요하면 틀을 직접 만든다 */
   function mountProfile() {
@@ -572,7 +645,7 @@
     const root = el.closest('[data-cmt-root]'), id = el.dataset.id;
     UI.menu(el, [
       el.dataset.del && { label: '삭제', icon: 'delete', danger: true, onClick: () => Actions['cmt-del'](el) },
-      !el.closest('.cmt-it').querySelector('.me') && { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'comment', id: root.dataset.board + ':' + root.dataset.post + ':' + id, label: (el.closest('.cmt-it').querySelector('.cmt-text').textContent || '').slice(0, 40), link: 'board-view.html?b=' + root.dataset.board + '&id=' + root.dataset.post + '#c-' + id }) }
+      !el.closest('.cmt-it').querySelector('.me') && { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'comment', id: root.dataset.board + ':' + root.dataset.post + ':' + id, label: (el.closest('.cmt-it').querySelector('.cmt-text').textContent || '').slice(0, 40), link: Store.commentHref(root.dataset.board, root.dataset.post, id) }) }
     ]);
   };
   Actions['cmt-del'] = async el => {

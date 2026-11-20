@@ -28,12 +28,31 @@
   const SENS = ['name', 'rank', 'birth', 'phone'];   // 바꾸면 교회 승인이 필요한 신상 항목
   const SENS_LABEL = { name: '이름', rank: '직분', birth: '생년월일', phone: '연락처' };
 
+  const requiredConsents = ['age', 'terms', 'privacy', 'sensitive'];
+  const consentVersions = { terms: '[시행일]', privacy: '[시행일]' };
+  const hasRequiredConsents = choices => requiredConsents.every(key => choices?.[key] === true);
+  function signupBirthError(birth) {
+    const now = new Date(), [y, m, d] = String(birth).split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birth) || y < 1850 || date.getFullYear() !== y ||
+        date.getMonth() !== m - 1 || date.getDate() !== d || date > now)
+      return '생년월일을 숫자로 입력해 주세요. (예: 1951년 4월 1일)';
+    if (new Date(y + 14, m - 1, d) > now)
+      return `이 홈페이지는 만 14세 미만의 가입을 받지 않습니다. 어린이·청소년부 소식은 담당 선생님이나 관리자가 올립니다. 궁금한 점은 교회(${CHURCH.phone})로 문의해 주세요.`;
+    return '';
+  }
+
   async function signup(f) {
+    const birthError = signupBirthError(f.birth);
+    if (birthError) return { ok: false, field: 'birth', error: birthError };
+    if (!hasRequiredConsents(f.consent)) return { ok: false, field: 'consent', error: '필수 항목에 모두 동의해 주세요.' };
+    const consent = { age: true, terms: true, privacy: true, sensitive: true, phone: f.consent.phone === true,
+      at: new Date().toISOString(), versions: { ...consentVersions } };
+    const salt = makeSalt(), hash = await hashPw(f.password, salt);
     const list = users();
     if (list.some(u => u.username.toLowerCase() === f.username.toLowerCase())) return { ok: false, field: 'username', error: '이미 사용 중인 아이디입니다.' };
-    const salt = makeSalt();
-    const u = { id: 'm' + uid(), username: f.username, salt, hash: await hashPw(f.password, salt),
-      name: f.name, rank: f.rank, birth: f.birth, phone: f.phone || '', bio: '', photo: '', pending: null, createdAt: Date.now(),
+    const u = { id: 'm' + uid(), username: f.username, salt, hash, consent,
+      name: f.name, rank: f.rank, birth: f.birth, phone: consent.phone ? f.phone || '' : '', bio: (f.bio || '').trim().slice(0, 200), photo: '', pending: null, createdAt: Date.now(),
       status: 'pending', groups: [], parish: null, privacy: Object.assign({}, PRIV_DEFAULT) };   // status: 홈페이지 가입 승인(관리자)
     const news = applyAffil(u, f.groups || [], f.parish || '');
     list.push(u);
@@ -205,7 +224,7 @@
     out.needLogin = !viewer && PRIV_FIELDS.some(([k]) => privOf(u)[k] === 'members' && val[k] && val[k].length !== 0);   // 로그인하면 더 볼 수 있는 항목이 있는지
     return out;
   }
-  const postsOfUser = id => rawPosts().filter(p => p.owner === id && !p.anon).sort((a, b) => b.at - a.at);
+  const postsOfUser = id => rawPosts().filter(p => p.owner === id && !p.anon && canSeePost(p)).sort((a, b) => b.at - a.at);
   const prefs = () => Object.assign({ bigText: false }, read(K.prefs, {}));
   const setPref = (k, v) => { const p = prefs(); p[k] = v; write(K.prefs, p); };
   const allMembers = () => users().map(u => ({ id: u.id, name: u.name, username: u.username, rank: u.rank }));
@@ -217,6 +236,7 @@
   const userName = o => { const u = users().find(x => x.id === o.owner); return u ? u.name : (o.name || '게스트'); };
   const displayAuthor = o => o.anon ? (isAdmin() ? '익명(' + userName(o) + ')' : '익명') : userName(o);
 
+  const canSeePost = p => !p.hidden || isMine(p.owner) || isAdmin();
   const rawPosts = () => read(K.posts, []);
   const rawComments = () => read(K.comments, []);
   const CMT_POOL = ['은혜 받았습니다. 감사합니다.', '함께 기도하겠습니다.', '좋은 소식 감사합니다.', '아멘! 기대됩니다.', '수고 많으셨습니다. 늘 감사드려요.', '다음 모임에도 참여하겠습니다.'];
@@ -233,13 +253,20 @@
   function allPosts(b) {
     const fake = boardPosts(b).map(p => Object.assign(p, { id: String(p.id), comments: fakeCount(b, p.id) + rawComments().filter(c => c.board === b && c.postId === String(p.id)).length }));
     fake.forEach(p => { p.authorId = BOARDS[b].anon ? null : 'demo:' + p.author; });
-    const mine = rawPosts().filter(p => p.board === b).sort((x, y) => y.at - x.at).map(p => ({
-      id: p.id, title: p.title, date: p.date, author: displayAuthor(p), authorId: p.anon || !users().some(u => u.id === p.owner) ? null : p.owner, at: p.at, views: p.views || 0, pinned: false, user: true, owner: p.owner,
+    const mine = rawPosts().filter(p => p.board === b && canSeePost(p)).sort((x, y) => y.at - x.at).map(p => ({
+      id: p.id, title: p.title, date: p.date, author: displayAuthor(p), authorId: p.anon || !users().some(u => u.id === p.owner) ? null : p.owner, at: p.at, views: p.views || 0, pinned: false, user: true, owner: p.owner, hidden: !!p.hidden,
       hasPhoto: /<img/.test(p.html), hasFile: false, comments: commentCount(b, p.id) }));
     const pinned = fake.filter(p => p.pinned), rest = fake.filter(p => !p.pinned);
     return pinned.concat(mine, rest);
   }
   const getPost = id => rawPosts().find(p => p.id === id) || null;
+  function setPostHidden(id, hidden) {
+    const list = rawPosts(), p = list.find(x => x.id === id);
+    if (!p || !(isMine(p.owner) || isAdmin())) return false;
+    if (hidden) p.hidden = true;
+    else delete p.hidden;
+    return write(K.posts, list);
+  }
   function savePost(f) {
     const list = rawPosts(), html = sanitize(f.html);
     let p = f.id && list.find(x => x.id === f.id);
@@ -263,6 +290,11 @@
       .map(c => ({ id: c.id, text: c.text, date: c.date, at: c.at, parent: c.parent || null, name: displayAuthor(c), authorId: c.anon || !users().some(u => u.id === c.owner) ? null : c.owner, mine: isMine(c.owner) }));
     return (/^\d+$/.test(String(id)) ? fakeComments(b, +id) : []).concat(mine);
   }
+  function commentHref(board, postId, commentId) {
+    const id = encodeURIComponent(postId);
+    const page = board === 'album' ? 'album-view.html?a=' + id : 'board-view.html?b=' + encodeURIComponent(board) + '&id=' + id;
+    return commentId ? page + '#c-' + encodeURIComponent(commentId) : page;
+  }
   function addComment(f) {
     const list = rawComments(), m = me();
     let parent = f.parent ? String(f.parent) : null;                        // 답글은 1단계만: 답글에 단 답글은 원래 댓글 아래로
@@ -273,7 +305,7 @@
     if (!write(K.comments, list)) return false;
     /* 알림: 내 글에 댓글 → 글쓴이 / 내 댓글에 답글 → 댓글 쓴이 */
     try {
-      const who = c.anon ? '익명' : c.name, post = getPost(c.postId), link = 'board-view.html?b=' + c.board + '&id=' + c.postId + '#c-' + c.id;
+      const who = c.anon ? '익명' : c.name, post = getPost(c.postId), link = commentHref(c.board, c.postId, c.id);
       const title = post ? post.title : ((BOARDS[c.board] && BOARDS[c.board].titles[+c.postId - 1]) || '글');
       const replyTo = (pc || {}).owner;
       if (parent && replyTo && replyTo !== c.owner) notify({ to: replyTo, type: 'reply', text: who + '님이 내 댓글에 답글을 남겼습니다: ' + c.text.slice(0, 40), link });
@@ -283,10 +315,13 @@
   }
   function deleteComment(id) { return write(K.comments, rawComments().filter(c => c.id !== id && c.parent !== id)); }   // 답글도 함께
   function myComments() {
-    return rawComments().filter(c => isMine(c.owner)).sort((a, b) => b.at - a.at).map(c => {
-      const p = getPost(c.postId), t = p ? p.title : ((BOARDS[c.board] && BOARDS[c.board].titles[+c.postId - 1]) || '(삭제된 글)');
-      return { id: c.id, board: c.board, postId: c.postId, postTitle: t, text: c.text, at: c.at, isReply: !!c.parent };
-    });
+    const posts = new Map(rawPosts().map(p => [p.id, p]));
+    return rawComments().filter(c => isMine(c.owner) && (!posts.has(c.postId) || canSeePost(posts.get(c.postId))))
+      .sort((a, b) => b.at - a.at).map(c => {
+        const p = posts.get(c.postId);
+        const target = c.board === 'album' ? ALBUMS.find(a => a.id === +c.postId)?.title : BOARDS[c.board]?.titles[+c.postId - 1];
+        return { id: c.id, board: c.board, postId: c.postId, postTitle: p?.title || target || '(삭제된 글)', hidden: !!p?.hidden, text: c.text, at: c.at, isReply: !!c.parent };
+      });
   }
 
   /* ---------- 글 HTML 정리 (허용한 태그만 남김) ---------- */
@@ -334,8 +369,8 @@
   /* 저장 공간 사용량(대략, KB) — 한도는 브라우저마다 약 5MB */
   function usageKB() { let n = 0; try { Object.values(K).forEach(k => { n += (localStorage.getItem(k) || '').length * 2; }); } catch (e) {} return Math.round(n / 1024); }
 
-  window.Store = { me, usernameTaken, signup, login, logout, updateProfile, cancelPending, changePassword, withdraw, resetAll, isAdmin, setAdmin, pendingList, resolvePending,
-    SENS, SENS_LABEL, allPosts, getPost, savePost, deletePost, addView, myPosts, isMine, commentsOf, commentCount, addComment, deleteComment, sanitize, resizeImage, usageKB, today };
+  window.Store = { me, usernameTaken, signup, hasRequiredConsents, signupBirthError, login, logout, updateProfile, cancelPending, changePassword, withdraw, resetAll, isAdmin, setAdmin, pendingList, resolvePending,
+    SENS, SENS_LABEL, allPosts, getPost, canSeePost, setPostHidden, commentHref, savePost, deletePost, addView, myPosts, isMine, commentsOf, commentCount, addComment, deleteComment, sanitize, resizeImage, usageKB, today };
   /* v3-A 회원 확장 내보내기 (A 채팅 구역) */
   Object.assign(window.Store, { userCard, profileOf, postsOfUser, statusOf, privOf, setPrivacy, PRIV_FIELDS, PRIV_LABEL, PRIV_DEFAULT, GROUP_NAMES, EDU, PARISHES, parishName, groupName, groupText,
     leaderIds, setLeader, leaderOf, isLeader, affilQueue, resolveAffil, signupList, resolveSignup, prefs, setPref, allMembers });
@@ -372,6 +407,8 @@
     const m = me(); if (!m) return [];
     const p = prefsOf(m.id), adm = isAdmin();
     let l = read(K.notifs, []).filter(n => n.to === m.id || (n.to === 'admin' && adm && p[n.type])).sort((a, b) => b.at - a.at);
+    const hidden = new Set(rawPosts().filter(post => !canSeePost(post)).map(post => commentHref(post.board, post.id)));
+    if (hidden.size) l = l.filter(n => !hidden.has((n.link || '').split('#')[0]));
     if (o && o.unreadOnly) l = l.filter(n => !n.read);
     return l;
   }

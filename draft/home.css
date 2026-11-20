@@ -201,3 +201,11 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 .toast.show{transform:translate(-50%,0);opacity:1}
 .toast .ms{color:#7fd6a3}
 @media (max-width:1024px){.logo-img{width:34px;height:34px;border-radius:8px}}
+
+.ft-legal{display:flex;justify-content:center;gap:8px 20px;flex-wrap:wrap;padding:12px 0 6px;color:#e0e6f0}
+.ft-legal a:first-child{font-weight:700}
+.ft-legal a:hover,.ft-legal a:focus-visible{text-decoration:underline}
+.ft-copy small{font-size:.88em;white-space:nowrap}
+.post-hidden{display:inline-block;flex:none;margin-inline-start:.4em;padding:1px 6px;border-radius:4px;background:#edf0f5;color:#49576c;font:600 12px/1.5 Pretendard,sans-serif;vertical-align:middle;white-space:nowrap}
+[data-slot="home-notice"] .d{margin-inline-start:auto}
+[data-slot="home-notice"] .post-hidden{margin-inline-start:0}

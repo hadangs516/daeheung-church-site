@@ -68,7 +68,7 @@
       np.innerHTML = `<div class="np-hd"><b>알림</b>${L.length ? `<span class="np-n">${L.length}</span>` : ''}<button type="button" class="np-all" data-np="all"${L.length ? '' : ' disabled'}><span class="ms">done_all</span>모두 읽음</button><button type="button" class="np-x" data-np="close" aria-label="닫기"><span class="ms">close</span></button></div>
         ${L.length ? `<ul class="np-list">${L.map(n => `<li><a class="np-it" href="${esc(n.link || '#')}" data-np-id="${n.id}"><span class="np-ic"><span class="ms">${NI[n.type] || 'notifications'}</span></span><span class="np-t"><b>${esc(n.text)}</b><em title="${UI.abs(n.at)}">${UI.rel(n.at)}</em></span></a></li>`).join('')}</ul>`
           : '<p class="np-none"><span class="ms">notifications_off</span>새 알림이 없습니다</p>'}
-        <a class="np-more" href="mypage.html#settings">지난 알림 보기</a>`;
+        <a class="np-more" href="mypage.html#settings/notif">지난 알림 보기</a>`;
     };
     const close = () => { document.removeEventListener('keydown', key, true); removeEventListener('resize', close); bg.remove(); btn.setAttribute('aria-expanded', 'false'); refreshBells(); };
     const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
@@ -84,16 +84,18 @@
   };
 
   /* ---------- 푸터 ---------- */
+  const legalPages = [['개인정보 처리방침', 'privacy.html'], ['이용약관', 'terms.html']];
+  const legalPage = legalPages.find(it => it[1] === file);
   const ft = $('#ft');
   if (ft) ft.innerHTML = `<div class="wrap ft-in">
       <div class="ft-logo"><span class="ms">church</span>${CHURCH.name}</div>
       <div class="ft-info"><p>${CHURCH.address}</p><p><span>전화 ${CHURCH.phone}</span><span>팩스 ${CHURCH.fax}</span></p></div>
       <div class="ft-visit"><p class="lb">방문자</p><p>오늘 <b>${CHURCH.visitorToday}</b><i></i>전체 <b>${CHURCH.visitorTotal}</b></p></div>
-    </div><div class="wrap ft-copy">Copyright © ${CHURCH.name}. All Rights Reserved.</div>`;
+    </div><div class="wrap ft-copy"><nav class="ft-legal" aria-label="이용 안내">${legalPages.map(([label, url]) => `<a href="${url}">${label}</a>`).join('')}</nav>Copyright © ${CHURCH.name}. All Rights Reserved. <small>v${APP_VERSION}</small></div>`;
 
   /* ---------- 홈: 공지사항은 저장된 글까지 포함해서 보여줌 ---------- */
   const hn = $('[data-slot="home-notice"]');
-  if (hn) hn.innerHTML = Store.allPosts('notice').slice(0, 6).map(p => `<li><a href="board-view.html?b=notice&id=${p.id}"><span class="t">${esc(p.title)}</span><span class="d">${p.date.slice(5)}</span></a></li>`).join('');
+  if (hn) hn.innerHTML = Store.allPosts('notice').slice(0, 6).map(p => `<li><a href="board-view.html?b=notice&id=${p.id}"><span class="t">${esc(p.title)}</span>${UI.hiddenBadge(p)}<span class="d">${p.date.slice(5)}</span></a></li>`).join('');
 
   /* ---------- 하위 페이지 공통 틀 ---------- */
   const sub = $('#sub');
@@ -109,12 +111,15 @@
     return;
   }
 
-  const group = MENU[curGroup] || MENU[0];
+  if (legalPage) curItem = legalPage;
+  const legalArticle = legalPage && sub.querySelector('.legal-doc');
+  const legalTitle = legalArticle?.querySelector('h1').textContent;
+  const group = legalPage ? { label: '이용 안내', items: legalPages } : MENU[curGroup] || MENU[0];
   const title = curItem ? curItem[0] : '';
   const heading = file === 'write.html' ? (Q.get('edit') ? '글 수정' : '글쓰기') : title;
   document.title = heading + ' | ' + CHURCH.name;
   sub.insertAdjacentHTML('beforebegin', `<section class="sv" style="background-image:url(${GROUP_IMG[curGroup] || GROUP_IMG[0]})">
-      <div class="wrap sv-in"><p class="sv-group">${group.label}</p><h1 class="sv-title">${title}</h1></div></section>
+      <div class="wrap sv-in"><p class="sv-group">${group.label}</p><h1 class="sv-title">${legalTitle || title}</h1></div></section>
     <nav class="snb-m" aria-label="${group.label} 하위 메뉴"><div class="wrap"><ul>${group.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}</a></li>`).join('')}</ul></div></nav>`);
   sub.innerHTML = `<div class="wrap sub-wrap">
       <aside class="snb"><h2>${group.label}</h2><ul>${group.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}<span class="ms">chevron_right</span></a></li>`).join('')}</ul></aside>
@@ -136,6 +141,10 @@
   const canWrite = b => { const r = WRITE_RULE[b]; return r === 'all' || (r === 'admin' && Store.isAdmin()); };
 
   /* ---------- 글 페이지 ---------- */
+  if (legalArticle) {
+    legalArticle.querySelector('h1').remove();
+    C.append(legalArticle);
+  }
   if (file === 'page.html') {
     const P = PAGES[Q.get('s')];
     C.innerHTML = P ? `<div class="page-body">${P.body}</div>` : '<p class="empty">준비 중입니다.</p>';
@@ -159,12 +168,12 @@
     if (!total) { C.innerHTML = tools + `<p class="empty">${q ? '검색 결과가 없습니다.' : '등록된 글이 없습니다.'}</p>` + foot(''); }
     else if (B.bulletin) {
       C.innerHTML = tools + `<ul class="bul-grid">${view.map(p => `<li><a href="board-view.html?b=${b}&id=${p.id}">
-        <span class="b-cover"><span class="b-church">${CHURCH.name}</span><span class="b-title">주 보</span><span class="b-no">${p.title.replace(' 주보', '')}</span><img src="${PHOTOS[(+p.id + 3) % 5]}" alt=""></span>
-        <span class="bul-t">${p.title}</span></a></li>`).join('')}</ul>` + foot(pager(total, size, page));
+        <span class="b-cover"><span class="b-church">${CHURCH.name}</span><span class="b-title">주 보</span><span class="b-no">${esc(p.title.replace(' 주보', ''))}</span><img src="${PHOTOS[(+p.id + 3) % 5]}" alt=""></span>
+        <span class="bul-t">${esc(p.title)}${UI.hiddenBadge(p)}</span></a></li>`).join('')}</ul>` + foot(pager(total, size, page));
     } else {
       C.innerHTML = tools + `<ul class="bd-list"><li class="bd-head"><span class="no">번호</span><span class="t">제목</span><span class="w">글쓴이</span><span class="d">날짜</span><span class="v">조회</span></li>
         ${view.map((p, i) => `<li${p.pinned ? ' class="pin"' : ''}><span class="no">${p.pinned ? '<em>공지</em>' : total - ((page - 1) * size + i)}</span>
-        <a class="t" href="board-view.html?b=${b}&id=${p.id}"><span class="t-txt">${esc(p.title)}</span>${p.comments ? `<span class="cmt-n" aria-label="댓글 ${p.comments}개">[${p.comments}]</span>` : ''}${p.hasFile ? '<span class="ms att" title="첨부파일">attach_file</span>' : ''}${p.hasPhoto ? '<span class="ms att" title="사진">image</span>' : ''}${p.user && Store.isMine(p.owner) ? '<em class="me">내 글</em>' : ''}</a>
+        <a class="t" href="board-view.html?b=${b}&id=${p.id}"><span class="t-txt">${esc(p.title)}</span>${UI.hiddenBadge(p)}${p.comments ? `<span class="cmt-n" aria-label="댓글 ${p.comments}개">[${p.comments}]</span>` : ''}${p.hasFile ? '<span class="ms att" title="첨부파일">attach_file</span>' : ''}${p.hasPhoto ? '<span class="ms att" title="사진">image</span>' : ''}${p.user && Store.isMine(p.owner) ? '<em class="me">내 글</em>' : ''}</a>
         <span class="w">${esc(p.author)}</span><span class="d">${p.date}</span><span class="v">${p.views}</span></li>`).join('')}</ul>` + foot(pager(total, size, page));
     }
   }
@@ -173,7 +182,12 @@
   if (file === 'board-view.html') {
     const b = Q.get('b'), B = BOARDS[b], posts = B ? Store.allPosts(b) : [];
     const id = String(Q.get('id') || '1'), i = posts.findIndex(p => p.id === id), p = posts[i];
-    if (!B || !p) { C.innerHTML = `<p class="empty">글을 찾을 수 없습니다. 삭제되었을 수 있습니다.</p><div class="btn-row center"><a class="btn line" href="board.html?b=${b}">목록으로</a></div>`; return; }
+    if (!p) {
+      const stored = B && Store.getPost(id);
+      const hidden = stored && stored.board === b && !Store.canSeePost(stored);
+      C.innerHTML = `<p class="empty">${hidden ? '숨겨진 글입니다.' : '글을 찾을 수 없습니다. 삭제되었을 수 있습니다.'}</p><div class="btn-row center"><a class="btn line" href="board.html?b=${encodeURIComponent(b)}">목록으로</a></div>`;
+      return;
+    }
     const U = p.user ? Store.getPost(id) : null;
     if (U) { Store.addView(id); p.views = (U.views || 0) + 1; }
     const mine = !!U && Store.isMine(U.owner), canDel = mine || (!!U && Store.isAdmin());
@@ -201,11 +215,15 @@
     const byNm = who.href ? `<a class="by-name" href="${who.href}">${nm}</a>` : `<span class="by-name">${nm}</span>`;
     Actions['post-more'] = btn => UI.menu(btn, [
       mine && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
+      canDel && { label: U.hidden ? '숨김 해제' : '숨기기', icon: U.hidden ? 'visibility' : 'visibility_off', onClick: () => {
+        if (!Store.setPostHidden(id, !U.hidden)) return toast('숨김 상태를 변경하지 못했습니다', 'error');
+        toastLater(U.hidden ? '숨김을 해제했습니다' : '글을 숨겼습니다'); location.reload();
+      } },
       canDel && { label: '삭제', icon: 'delete', danger: true, onClick: () => Actions['post-del']({ dataset: { id, board: b } }) },
       canDel && { sep: true },
       { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'post', id: b + ':' + id, label: p.title }) }
     ]);
-    C.innerHTML = `<article class="post" data-img-ctx="post:${b}:${id}" data-img-label="${esc(p.title)}"><header class="post-hd"><h3>${esc(p.title)}</h3>
+    C.innerHTML = `<article class="post" data-img-ctx="post:${b}:${id}" data-img-label="${esc(p.title)}"><header class="post-hd"><h3>${esc(p.title)}${UI.hiddenBadge(p)}</h3>
         <div class="post-tools"><button type="button" class="share-btn" data-action="share" data-title="${esc(p.title)}" aria-label="공유"><span class="ms">share</span></button>
         <button type="button" class="more-btn" data-action="post-more" aria-label="글 메뉴" aria-haspopup="menu" aria-expanded="false"><span class="ms">more_vert</span></button></div>
         <div class="post-by">${byAv}<div class="by-tx">${byNm}<p class="post-meta"><span>${p.date}</span><span>조회 ${p.views}</span>${B.bulletin ? '' : `<span>댓글 <b data-cmt-count>${p.comments}</b></span>`}${U && U.edited ? '<span>수정됨</span>' : ''}</p></div></div></header>
@@ -214,7 +232,7 @@
         ${mine ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
         <a class="btn" href="board.html?b=${b}"><span class="ms">list</span>목록</a></div>
       ${B.bulletin ? '' : '<div id="cmt"></div>'}
-      ${others.length ? `<section class="related" aria-label="같은 게시판의 다른 글"><h3 class="rel-h">${B.title}의 다른 글</h3><ul class="rel-list">${others.map(x => `<li><a href="board-view.html?b=${b}&id=${x.id}"><span class="rel-t">${esc(x.title)}${x.comments ? `<span class="cmt-n">(${x.comments})</span>` : ''}</span><span class="rel-m">${esc(x.author)}<i></i>${x.date}</span></a></li>`).join('')}</ul></section>` : ''}`;
+      ${others.length ? `<section class="related" aria-label="같은 게시판의 다른 글"><h3 class="rel-h">${B.title}의 다른 글</h3><ul class="rel-list">${others.map(x => `<li><a href="board-view.html?b=${b}&id=${x.id}"><span class="rel-t">${esc(x.title)}${UI.hiddenBadge(x)}${x.comments ? `<span class="cmt-n">(${x.comments})</span>` : ''}</span><span class="rel-m">${esc(x.author)}<i></i>${x.date}</span></a></li>`).join('')}</ul></section>` : ''}`;
     if (!B.bulletin) Member.comments($('#cmt'), b, id);
   }
 
@@ -245,13 +263,15 @@
   if (file === 'album.html') {
     const size = 6, page = Math.min(Math.max(1, +Q.get('p') || 1), Math.ceil(ALBUMS.length / size));
     C.innerHTML = `<ul class="album-grid">${ALBUMS.slice((page - 1) * size, page * size).map(a => `<li><a href="album-view.html?a=${a.id}"><span class="cover"><img src="${a.photos[0]}" alt=""><span class="cnt"><span class="ms">photo_library</span>${a.photos.length}</span></span>
-      <span class="al-t">${a.title}</span><span class="al-d">${a.date}</span></a></li>`).join('')}</ul>` + pager(ALBUMS.length, size, page);
+      <span class="al-t">${a.title}</span><span class="al-d">${a.date} · 댓글 ${Store.commentCount('album', a.id)}개</span></a></li>`).join('')}</ul>` + pager(ALBUMS.length, size, page);
   }
   if (file === 'album-view.html') {
     const k = Math.max(0, ALBUMS.findIndex(x => x.id === +Q.get('a'))), a = ALBUMS[k], prev = ALBUMS[k + 1], next = ALBUMS[k - 1];
-    C.innerHTML = `<div class="al-hd"><h3>${a.title}</h3><p>${a.date} · 사진 ${a.photos.length}장</p></div>
+    C.innerHTML = `<div class="al-hd"><h3>${a.title}</h3><p>${a.date} · 사진 ${a.photos.length}장 · 댓글 <b data-cmt-count>${Store.commentCount('album', a.id)}</b></p></div>
       <ul class="photo-list" data-gallery data-img-ctx="album:${a.id}" data-img-label="${esc(a.title)}">${a.photos.map((p, i) => `<li><figure><button type="button" data-view data-src="${p}" aria-label="사진 ${i + 1} 크게 보기"><img src="${p}" alt="${esc(a.title)} 사진 ${i + 1}" loading="lazy"></button><figcaption>${i + 1} / ${a.photos.length}</figcaption></figure></li>`).join('')}</ul>
+      <div id="cmt"></div>
       <div class="btn-row center">${next ? `<a class="btn line" href="album-view.html?a=${next.id}"><span class="ms">chevron_left</span>이전 앨범</a>` : ''}<a class="btn line" href="album.html">앨범 목록</a>${prev ? `<a class="btn line" href="album-view.html?a=${prev.id}">다음 앨범<span class="ms">chevron_right</span></a>` : ''}</div>`;
+    Member.comments($('#cmt'), 'album', String(a.id));
   }
 
   /* ---------- 교회 일정 ---------- */

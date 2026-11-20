@@ -353,4 +353,22 @@
   }
 
   window.Affil = { GROUPS: GROUPS, open: open, label: label };
+
+  if (document.getElementById('b-adult')) {
+    var selected = [];
+    async function run(birth, sel) {
+      var r = await Affil.open({ birth: birth, selected: sel || [] });
+      document.getElementById('out-note').textContent = '열 때 생일: ' + (birth || '(없음)') + ' → ' + (r === null ? '취소(null)' : r.length ? r.length + '개 선택' : '무소속([])');
+      if (r === null) return;
+      selected = r;
+      document.getElementById('out-label').textContent = Affil.label(r);
+      document.getElementById('out-json').textContent = JSON.stringify(r);
+    }
+    document.getElementById('b-adult').onclick = function () { run('1951-04-01', []); };
+    document.getElementById('b-minor').onclick = function () { run('2012-03-01', []); };
+    document.getElementById('b-unknown').onclick = function () { run('', []); };
+    document.getElementById('b-edit').onclick = function () {
+      run('1951-04-01', selected.length ? selected : [{ id: 'men2', role: 'member' }, { id: 'kinder', role: 'teacher' }]);
+    };
+  }
 })();
