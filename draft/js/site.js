@@ -3,8 +3,6 @@
 (function () {
   const Q = new URLSearchParams(location.search);
   const file = (location.pathname.split('/').pop() || 'home.html');
-  if (!Q.has('b') && ['board.html', 'board-view.html', 'write.html'].includes(file)) Q.set('b', file === 'write.html' ? 'freeboard' : 'notice');
-  if (!Q.has('s') && file === 'page.html') Q.set('s', 'greeting');
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MEMBER_PAGES = { 'login.html': ['로그인', 'login'], 'join.html': ['회원가입', 'join'], 'mypage.html': ['마이페이지', 'mypage'], 'profile.html': ['프로필', 'profile'] };
@@ -36,60 +34,24 @@
     hd.insertAdjacentHTML('beforebegin', `<div class="hd-top"><div class="wrap">${authLinks()}</div></div>`);
     hd.innerHTML = `<div class="wrap hd-in">
       <a class="logo" href="home.html"><img class="logo-img" src="img/brand/icon-192.png" alt=""><span class="logo-txt">${CHURCH.name}</span></a>
-      <nav class="gnb" id="gnb" aria-label="주 메뉴"><div class="gnb-user">${authLinks(true)}</div><ul>${MENU.map((g, gi) => `<li class="${gi === curGroup ? 'cur' : ''}"><a href="${g.items[0][1]}">${g.label}</a>
+      <nav class="gnb" id="gnb"><div class="gnb-user">${authLinks(true)}</div><ul>${MENU.map((g, gi) => `<li class="${gi === curGroup ? 'cur' : ''}"><a href="${g.items[0][1]}">${g.label}</a>
         <ul class="sub">${g.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}</a></li>`).join('')}</ul></li>`).join('')}</ul></nav>
-      <div class="hd-r"><button type="button" class="jump-top" data-action="to-top" aria-label="맨 위로" title="맨 위로">↑</button>${bellBtn('bell-m')}<button class="burger" id="burger" aria-controls="gnb" aria-expanded="false" aria-label="메뉴 열기"><span class="ms">menu</span></button></div></div>`;
+      <div class="hd-r">${bellBtn('bell-m')}<button class="burger" id="burger" aria-label="메뉴 열기"><span class="ms">menu</span></button></div></div>`;
     const b = $('#burger'), g = $('#gnb');
-    const jump = hd.querySelector('.jump-top');
-    const showJump = () => { jump.hidden = scrollY <= 500; };
-    showJump();
-    addEventListener('scroll', showJump, { passive: true });
-    const mobileNav = matchMedia('(max-width:1024px)');
-    const groups = [...g.querySelectorAll(':scope > ul > li')];
-    function toggleNav(open) {
-      g.classList.toggle('open', open);
-      g.inert = mobileNav.matches && !open;
-      document.body.classList.toggle('lock', open);
-      b.setAttribute('aria-expanded', String(open));
-      b.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
-      b.querySelector('.ms').textContent = open ? 'close' : 'menu';
-      if (open) g.querySelector('a').focus({ preventScroll: true });
-    }
-    function syncGroups() {
-      groups.forEach(li => {
-        const link = li.firstElementChild, list = li.querySelector('.sub');
-        const open = li.classList.contains('on');
-        list.inert = mobileNav.matches && !open;
-        if (mobileNav.matches) link.setAttribute('aria-expanded', String(open));
-        else link.removeAttribute('aria-expanded');
-        list.style.height = mobileNav.matches ? (open ? list.scrollHeight : 0) + 'px' : '';
-      });
-    }
-    b.addEventListener('click', () => toggleNav(!g.classList.contains('open')));
-    groups.forEach(li => li.firstElementChild.addEventListener('click', e => {
-      if (!mobileNav.matches) return;
+    b.addEventListener('click', () => { const o = g.classList.toggle('open'); document.body.classList.toggle('lock', o); b.querySelector('.ms').textContent = o ? 'close' : 'menu'; });
+    /* 모바일: 상위 메뉴를 누르면 하위 메뉴가 부드럽게 펼쳐지고 접힌다 (높이 애니메이션 + 화살표 회전) */
+    g.querySelectorAll(':scope > ul > li > a').forEach(a => a.addEventListener('click', e => {
+      if (innerWidth > 1024) return;
       e.preventDefault();
-      li.classList.toggle('on');
-      syncGroups();
+      const li = a.parentElement, sb = li.querySelector('.sub'), open = !li.classList.contains('on');
+      li.classList.toggle('on', open); a.setAttribute('aria-expanded', open);
+      sb.style.height = open ? sb.scrollHeight + 'px' : '0px';
     }));
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && g.classList.contains('open')) {
-        toggleNav(false);
-        b.focus();
-      }
-      if (e.key === 'Tab' && g.classList.contains('open')) {
-        const first = g.querySelector('a');
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); b.focus(); }
-        if (!e.shiftKey && document.activeElement === b) { e.preventDefault(); first.focus(); }
-      }
-    });
-    mobileNav.addEventListener('change', () => { toggleNav(false); syncGroups(); });
-    addEventListener('resize', syncGroups);
-    toggleNav(false);
-    syncGroups();
+    addEventListener('resize', () => { if (innerWidth > 1024) g.querySelectorAll('.sub').forEach(x => x.style.height = ''); });
   }
 
   /* ---------- 알림함 ---------- */
+  const NI = { signup: 'person_add', approval: 'verified', group: 'groups', comment: 'chat_bubble', reply: 'reply', bulletin: 'menu_book', notice: 'campaign' };
   function refreshBells() {
     const n = Store.me() ? Store.unreadCount() : 0;
     document.querySelectorAll('.bell').forEach(b => { const i = b.querySelector('.bell-n'); i.hidden = !n; i.textContent = n > 99 ? '99+' : n; b.setAttribute('aria-label', n ? '알림함, 안 읽은 알림 ' + n + '개' : '알림함'); });
@@ -103,69 +65,61 @@
     const np = bg.firstChild;
     const draw = () => {
       const L = Store.myNotifs({ unreadOnly: true });
-      np.innerHTML = `<div class="np-hd"><b>알림</b>${L.length ? `<span class="np-n">${L.length}</span>` : ''}<button type="button" class="np-all" data-np="all"${L.length ? '' : ' disabled'}>모두 읽음</button><button type="button" class="np-x" data-np="close" aria-label="닫기"><span class="ms">close</span></button></div>
-        ${L.length ? `<ul class="np-list">${L.map(n => `<li><a class="np-it" href="${esc(n.link || '#')}" data-np-id="${n.id}"><span class="np-t"><b>${esc(n.text)}</b><em title="${UI.abs(n.at)}">${UI.rel(n.at)}</em></span></a></li>`).join('')}</ul>`
-          : '<p class="np-none">새로 받은 알림이 없습니다.</p>'}
-        <a class="np-more" href="mypage.html#settings/notif">지난 알림 보기</a>`;
+      np.innerHTML = `<div class="np-hd"><b>알림</b>${L.length ? `<span class="np-n">${L.length}</span>` : ''}<button type="button" class="np-all" data-np="all"${L.length ? '' : ' disabled'}><span class="ms">done_all</span>모두 읽음</button><button type="button" class="np-x" data-np="close" aria-label="닫기"><span class="ms">close</span></button></div>
+        ${L.length ? `<ul class="np-list">${L.map(n => `<li><a class="np-it" href="${esc(n.link || '#')}" data-np-id="${n.id}"><span class="np-ic"><span class="ms">${NI[n.type] || 'notifications'}</span></span><span class="np-t"><b>${esc(n.text)}</b><em title="${UI.abs(n.at)}">${UI.rel(n.at)}</em></span></a></li>`).join('')}</ul>`
+          : '<p class="np-none"><span class="ms">notifications_off</span>새 알림이 없습니다</p>'}
+        <a class="np-more" href="mypage.html#settings">지난 알림 보기</a>`;
     };
-    const close = () => { document.removeEventListener('keydown', key, true); removeEventListener('resize', close); bg.remove(); btn.focus({ preventScroll: true }); btn.setAttribute('aria-expanded', 'false'); refreshBells(); };
+    const close = () => { document.removeEventListener('keydown', key, true); removeEventListener('resize', close); bg.remove(); btn.setAttribute('aria-expanded', 'false'); refreshBells(); };
     const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
     bg.addEventListener('click', e => {
       if (e.target === bg) return close();
       const a = e.target.closest('[data-np]');
-      if (a) { if (a.dataset.np === 'close') close(); else if (a.dataset.np === 'all') { Store.readAllNotifs(); draw(); refreshBells(); np.querySelector('.np-x').focus({ preventScroll: true }); toast('모두 읽음으로 바꿨습니다. 지난 알림은 마이페이지에서 볼 수 있어요.', 'info'); } return; }
+      if (a) { if (a.dataset.np === 'close') close(); else if (a.dataset.np === 'all') { Store.readAllNotifs(); draw(); refreshBells(); toast('모두 읽음으로 바꿨습니다. 지난 알림은 마이페이지에서 볼 수 있어요.', 'info'); } return; }
       const it = e.target.closest('[data-np-id]'); if (it) { Store.readNotif(it.dataset.npId); if (!it.getAttribute('href') || it.getAttribute('href') === '#') { e.preventDefault(); draw(); refreshBells(); } }
     });
     draw(); document.body.append(bg); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('keydown', key, true);
-    addEventListener('resize', close);
-    np.querySelector('.np-x').focus({ preventScroll: true });
     if (mobile) { bg.classList.add('mob'); requestAnimationFrame(() => bg.classList.add('open')); }
-    else { const r = btn.getBoundingClientRect(), w = np.offsetWidth; np.style.top = Math.max(8, Math.min(r.bottom + 8, innerHeight - np.offsetHeight - 8)) + 'px'; np.style.left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8) + 'px'; }
+    else { const r = btn.getBoundingClientRect(), w = np.offsetWidth; np.style.top = r.bottom + 8 + 'px'; np.style.left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8) + 'px'; addEventListener('resize', close); }
   };
 
   /* ---------- 푸터 ---------- */
   const ft = $('#ft');
   if (ft) ft.innerHTML = `<div class="wrap ft-in">
-      <div class="ft-logo">${CHURCH.name}</div>
+      <div class="ft-logo"><span class="ms">church</span>${CHURCH.name}</div>
       <div class="ft-info"><p>${CHURCH.address}</p><p><span>전화 ${CHURCH.phone}</span><span>팩스 ${CHURCH.fax}</span></p></div>
       <div class="ft-visit"><p class="lb">방문자</p><p>오늘 <b>${CHURCH.visitorToday}</b><i></i>전체 <b>${CHURCH.visitorTotal}</b></p></div>
-    </div><div class="wrap ft-copy"><span>© ${CHURCH.name}. All Rights Reserved.</span><button type="button" class="to-top" data-action="to-top">맨 위로 ↑</button></div>`;
+    </div><div class="wrap ft-copy">Copyright © ${CHURCH.name}. All Rights Reserved.</div>`;
 
   /* ---------- 홈: 공지사항은 저장된 글까지 포함해서 보여줌 ---------- */
   const hn = $('[data-slot="home-notice"]');
-  if (hn) hn.innerHTML = Store.allPosts('notice').slice(0, 6).map(p => `<li><a href="board-view.html?b=notice&id=${p.id}"><span class="t">${esc(p.title)}</span><span class="d">${esc(p.date)}</span></a></li>`).join('');
+  if (hn) hn.innerHTML = Store.allPosts('notice').slice(0, 6).map(p => `<li><a href="board-view.html?b=notice&id=${p.id}"><span class="t">${esc(p.title)}</span><span class="d">${p.date.slice(5)}</span></a></li>`).join('');
 
   /* ---------- 하위 페이지 공통 틀 ---------- */
   const sub = $('#sub');
   if (!sub) return;
 
-  function banner(title, photo, path) {
-    const trail = path.map(item => item.href ? `<a href="${item.href}">${esc(item.label)}</a>` : `<span>${esc(item.label)}</span>`);
-    return `<section class="sv" style="background-image:url(${photo})"><div class="wrap sv-in">
-      <div class="sv-label"><h1 class="sv-title">${esc(title)}</h1>
-      <nav class="crumb" aria-label="현재 위치"><a href="home.html">홈</a>${trail.join('')}<b aria-current="page">${esc(title)}</b></nav></div>
-    </div></section>`;
-  }
+  /* 로그인·가입·마이페이지 (왼쪽 메뉴 없는 틀) */
   if (MEMBER_PAGES[file]) {
-    const [title, fn] = MEMBER_PAGES[file];
-    document.title = title + ' | ' + CHURCH.name;
-    sub.insertAdjacentHTML('beforebegin', banner(title, 'img/hero-interior.jpg', [{ label: '회원' }]));
-    sub.innerHTML = `<main class="wrap mb-wrap${['mypage', 'profile'].includes(fn) ? ' wide' : ''}"><div id="content"></div></main>`;
+    const [ttl, fn] = MEMBER_PAGES[file];
+    document.title = ttl + ' | ' + CHURCH.name;
+    sub.insertAdjacentHTML('beforebegin', `<section class="sv" style="background-image:url(img/hero-interior.jpg)"><div class="wrap sv-in"><p class="sv-group">회원</p><h1 class="sv-title">${ttl}</h1></div></section>`);
+    sub.innerHTML = `<div class="wrap mb-wrap${fn === 'mypage' ? ' wide' : ''}"><div id="content"></div></div>`;
     Member[fn]($('#content'));
     return;
   }
 
   const group = MENU[curGroup] || MENU[0];
-  const title = curItem ? curItem[0] : '교회 안내';
+  const title = curItem ? curItem[0] : '';
   const heading = file === 'write.html' ? (Q.get('edit') ? '글 수정' : '글쓰기') : title;
-  const path = [{ label: group.label, href: group.items[0][1] }];
-  if (heading !== title && curItem) path.push({ label: title, href: curItem[1] });
-  const links = group.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on" aria-current="page"' : ''}>${it[0]}</a></li>`).join('');
   document.title = heading + ' | ' + CHURCH.name;
-  sub.insertAdjacentHTML('beforebegin', banner(heading, GROUP_IMG[curGroup] || GROUP_IMG[0], path) +
-    `<nav class="snb-m" aria-label="${group.label} 하위 메뉴"><div class="wrap"><ul>${links}</ul></div></nav>`);
-  sub.innerHTML = `<div class="wrap sub-wrap"><aside class="snb"><h2>${group.label}</h2><nav aria-label="${group.label} 하위 메뉴"><ul>${links}</ul></nav></aside>
-      <main class="sub-main"><div id="content"></div></main></div>`;
+  sub.insertAdjacentHTML('beforebegin', `<section class="sv" style="background-image:url(${GROUP_IMG[curGroup] || GROUP_IMG[0]})">
+      <div class="wrap sv-in"><p class="sv-group">${group.label}</p><h1 class="sv-title">${title}</h1></div></section>
+    <nav class="snb-m" aria-label="${group.label} 하위 메뉴"><div class="wrap"><ul>${group.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}</a></li>`).join('')}</ul></div></nav>`);
+  sub.innerHTML = `<div class="wrap sub-wrap">
+      <aside class="snb"><h2>${group.label}</h2><ul>${group.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}<span class="ms">chevron_right</span></a></li>`).join('')}</ul></aside>
+      <main class="sub-main"><div class="sub-hd"><h2>${heading}</h2><p class="crumb"><span class="ms">home</span>홈<span class="ms">chevron_right</span>${group.label}<span class="ms">chevron_right</span>${file === 'write.html' ? title + '<span class="ms">chevron_right</span>' : ''}<b>${heading}</b></p></div>
+      <div id="content"></div></main></div>`;
   const C = $('#content');
   const onChip = $('.snb-m a.on'); if (onChip) { const ul = onChip.closest('ul'); ul.scrollLeft = onChip.offsetLeft - (ul.clientWidth - onChip.offsetWidth) / 2; }
 
@@ -193,16 +147,16 @@
   /* ---------- 게시판 목록 ---------- */
   if (file === 'board.html') {
     const b = Q.get('b'), B = BOARDS[b];
-    if (!B) { C.innerHTML = '<p class="empty">이 게시판을 찾을 수 없습니다.</p>'; return; }
+    if (!B) { C.innerHTML = '<p class="empty">없는 게시판입니다.</p>'; return; }
     const q = (Q.get('q') || '').trim(), size = B.bulletin ? 8 : 10;
     let posts = Store.allPosts(b);
     if (q) posts = posts.filter(p => (p.title + ' ' + p.author).toLowerCase().includes(q.toLowerCase()));
     const total = posts.length, page = Math.min(Math.max(1, +Q.get('p') || 1), Math.max(1, Math.ceil(total / size)));
     const view = posts.slice((page - 1) * size, page * size);
     const tools = `<div class="bd-tools"><p class="bd-count">${q ? `“${esc(q)}” 검색 결과 ` : '전체 '}<b>${total}</b>건${q ? ` · <a class="bd-all" href="board.html?b=${b}">전체 보기</a>` : ''}</p>
-      <form class="bd-search" action="board.html" method="get" role="search"><input type="hidden" name="b" value="${b}"><input type="search" name="q" value="${esc(q)}" placeholder="제목 또는 글쓴이" aria-label="제목 또는 글쓴이 검색"><button type="submit" aria-label="검색"><span class="ms">search</span></button></form></div>`;
+      <form class="bd-search" action="board.html" method="get" role="search"><input type="hidden" name="b" value="${b}"><input type="search" name="q" value="${esc(q)}" placeholder="검색어를 입력하세요" aria-label="검색어"><button type="submit" aria-label="검색"><span class="ms">search</span></button></form></div>`;
     const foot = pg => `<div class="bd-foot"><span></span>${pg || '<span></span>'}${canWrite(b) ? `<a class="btn" href="write.html?b=${b}"><span class="ms">edit</span>글쓰기</a>` : '<span></span>'}</div>`;
-    if (!total) { C.innerHTML = tools + `<p class="empty">${q ? '일치하는 글이 없습니다. 제목이나 글쓴이 이름으로 다시 찾아보세요.' : '등록된 글이 없습니다.'}</p>` + foot(''); }
+    if (!total) { C.innerHTML = tools + `<p class="empty">${q ? '검색 결과가 없습니다.' : '등록된 글이 없습니다.'}</p>` + foot(''); }
     else if (B.bulletin) {
       C.innerHTML = tools + `<ul class="bul-grid">${view.map(p => `<li><a href="board-view.html?b=${b}&id=${p.id}">
         <span class="b-cover"><span class="b-church">${CHURCH.name}</span><span class="b-title">주 보</span><span class="b-no">${p.title.replace(' 주보', '')}</span><img src="${PHOTOS[(+p.id + 3) % 5]}" alt=""></span>
@@ -228,15 +182,15 @@
       const heads = ['예배 순서', '교회 소식', '이번 주 말씀', '섬기는 분들'];
       body = `<div class="bul-pages">${heads.map((h, n) => `<figure class="bul-page"><div class="paper"><p class="pp-hd">${CHURCH.name} 주보 · ${p.date}</p><p class="pp-t">${h}</p>${'<i></i>'.repeat(9)}</div><figcaption>${n + 1}면</figcaption></figure>`).join('')}</div>
         <div class="btn-row center" style="margin-top:28px"><button type="button" class="btn line" data-action="soon"><span class="ms">download</span>주보 내려받기</button></div>
-        <p class="bulletin-note">주보 원본 사진과 내려받기 파일은 준비 중입니다.</p>`;
+        <p class="note-box"><span class="ms">info</span>실제 사이트에서는 주보 사진이 들어가고, 누르면 크게 보고 내려받을 수 있습니다.</p>`;
     } else if (U) {
-      body = `<div class="rt" data-gallery>${Store.sanitize(U.html).replace(/<img /g, '<img data-view role="button" tabindex="0" aria-label="사진 크게 보기" loading="lazy" ')}</div>`;
+      body = `<div class="rt" data-gallery>${Store.sanitize(U.html).replace(/<img /g, '<img data-view loading="lazy" ')}</div>`;
     } else {
       const pb = POST_BODY[b];
       body = `<div class="prose">${pb ? pb.map(t => `<p>${t}</p>`).join('') : `<p>${esc(p.title)} 내용을 알려 드립니다.</p>
         <p>성도 여러분의 많은 관심과 기도 부탁드립니다.</p>
         <p>· 일시: 2026년 11월 22일(주일) 오후 3:30<br>· 장소: 본당<br>· 문의: 교회 사무실 ${CHURCH.phone}</p>`}</div>
-        ${B.photo ? `<div class="post-photos" data-gallery>${PHOTOS.slice(1, 4).map((s, index) => `<img src="${s}" alt="" data-view role="button" tabindex="0" aria-label="사진 ${index + 1} 크게 보기">`).join('')}</div>` : ''}
+        ${B.photo ? `<div class="post-photos" data-gallery>${PHOTOS.slice(1, 4).map(s => `<img src="${s}" alt="" data-view>`).join('')}</div>` : ''}
         ${B.file || p.hasFile ? '<div class="attach"><span class="ms">attach_file</span><a href="#" data-action="soon">안내문.pdf</a><span class="size">(320KB)</span><button type="button" class="btn sm line" data-action="soon">내려받기</button></div>' : ''}`;
     }
     /* 같은 게시판의 다른 글 (현재 글과 가까운 5개) */
@@ -246,12 +200,10 @@
     const byAv = who.href ? `<a class="by-av" href="${who.href}" aria-label="${nm} 프로필 보기">${UI.avatar(who.card, p.author)}</a>` : `<span class="by-av">${UI.avatar(null, p.author)}</span>`;
     const byNm = who.href ? `<a class="by-name" href="${who.href}">${nm}</a>` : `<span class="by-name">${nm}</span>`;
     Actions['post-more'] = btn => UI.menu(btn, [
-      canDel && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
+      mine && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
       canDel && { label: '삭제', icon: 'delete', danger: true, onClick: () => Actions['post-del']({ dataset: { id, board: b } }) },
-      (mine || canDel) && { sep: true },
-      { label: '링크 복사', icon: 'link', onClick: () => { UI.copy(location.href); toast('주소를 복사했습니다'); } },
-      { label: '공유하기', icon: 'share', onClick: () => Actions.share({ dataset: { title: p.title } }) },
-      !mine && { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'post', id: b + ':' + id, label: p.title }) }
+      canDel && { sep: true },
+      { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'post', id: b + ':' + id, label: p.title }) }
     ]);
     C.innerHTML = `<article class="post" data-img-ctx="post:${b}:${id}" data-img-label="${esc(p.title)}"><header class="post-hd"><h3>${esc(p.title)}</h3>
         <div class="post-tools"><button type="button" class="share-btn" data-action="share" data-title="${esc(p.title)}" aria-label="공유"><span class="ms">share</span></button>
@@ -259,7 +211,7 @@
         <div class="post-by">${byAv}<div class="by-tx">${byNm}<p class="post-meta"><span>${p.date}</span><span>조회 ${p.views}</span>${B.bulletin ? '' : `<span>댓글 <b data-cmt-count>${p.comments}</b></span>`}${U && U.edited ? '<span>수정됨</span>' : ''}</p></div></div></header>
         <div class="post-body">${body}</div></article>
       <div class="post-actions"><span class="pa-l">
-        ${canDel ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
+        ${mine ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
         <a class="btn" href="board.html?b=${b}"><span class="ms">list</span>목록</a></div>
       ${B.bulletin ? '' : '<div id="cmt"></div>'}
       ${others.length ? `<section class="related" aria-label="같은 게시판의 다른 글"><h3 class="rel-h">${B.title}의 다른 글</h3><ul class="rel-list">${others.map(x => `<li><a href="board-view.html?b=${b}&id=${x.id}"><span class="rel-t">${esc(x.title)}${x.comments ? `<span class="cmt-n">(${x.comments})</span>` : ''}</span><span class="rel-m">${esc(x.author)}<i></i>${x.date}</span></a></li>`).join('')}</ul></section>` : ''}`;
@@ -268,9 +220,9 @@
 
   /* ---------- 설교 목록 ---------- */
   const sermonCard = s => `<li><a href="sermon-view.html?id=${s.id}"><span class="thumb"><img src="${s.thumb}" alt=""><span class="play"><span class="ms">play_arrow</span></span><span class="dur">${s.dur}</span></span>
-      <span class="sc-t">${s.title}</span><span class="sc-m">${s.passage}</span><span class="sc-m">${s.preacher} · ${s.date}</span></a></li>`;
+      <span class="sc-cat">${s.cat}</span><span class="sc-t">${s.title}</span><span class="sc-m">${s.passage}</span><span class="sc-m">${s.preacher} · ${s.date}</span></a></li>`;
   if (file === 'sermons.html') {
-    const c = SERMON_CATS.includes(Q.get('c')) ? Q.get('c') : SERMON_CATS[0], size = 3;
+    const c = SERMON_CATS.includes(Q.get('c')) ? Q.get('c') : SERMON_CATS[0], size = 6;
     const list = SERMONS.filter(s => s.cat === c), page = Math.min(Math.max(1, +Q.get('p') || 1), Math.max(1, Math.ceil(list.length / size)));
     C.innerHTML = `<div class="tabs">${SERMON_CATS.map(k => `<a href="sermons.html?c=${encodeURIComponent(k)}"${k === c ? ' class="on"' : ''}>${k}</a>`).join('')}</div>
       <ul class="sermon-grid">${list.slice((page - 1) * size, page * size).map(sermonCard).join('')}</ul>` + pager(list.length, size, page);
@@ -281,9 +233,9 @@
     const s = SERMONS.find(x => x.id === +Q.get('id')) || SERMONS[0];
     const more = SERMONS.filter(x => x.cat === s.cat && x.id !== s.id).slice(0, 3);
     C.innerHTML = `<div class="sv-player" data-action="soon" role="button" tabindex="0" aria-label="영상 재생"><img src="${s.thumb}" alt=""><span class="play big"><span class="ms">play_arrow</span></span><span class="yt-note">유튜브 영상이 들어갈 자리</span></div>
-      <div class="sv-info"><h3>${s.title}</h3>
+      <div class="sv-info"><span class="sc-cat">${s.cat}</span><h3>${s.title}</h3>
         <button type="button" class="share-btn" data-action="share" data-title="${esc(s.title)}" aria-label="공유"><span class="ms">share</span></button>
-        <p class="sv-meta"><span>${s.cat}</span><span><a href="#" data-action="soon">${s.passage}</a></span><span>${s.preacher}</span><span>${s.date}</span></p>
+        <p class="sv-meta"><span><span class="ms">menu_book</span><a href="#" data-action="soon">${s.passage}</a></span><span><span class="ms">person</span>${s.preacher}</span><span><span class="ms">calendar_today</span>${s.date}</span></p>
         <div class="btn-row"><button type="button" class="btn" data-action="soon"><span class="ms">description</span>설교 질문지 받기</button><button type="button" class="btn line" data-action="soon"><span class="ms">open_in_new</span>본문 읽기</button></div></div>
       <h3 class="h3">${s.cat} 다른 설교</h3><ul class="sermon-grid three">${more.map(sermonCard).join('')}</ul>
       <div class="btn-row center"><a class="btn line" href="sermons.html?c=${encodeURIComponent(s.cat)}">목록으로</a></div>`;
@@ -292,7 +244,7 @@
   /* ---------- 포토앨범 ---------- */
   if (file === 'album.html') {
     const size = 6, page = Math.min(Math.max(1, +Q.get('p') || 1), Math.ceil(ALBUMS.length / size));
-    C.innerHTML = `<ul class="album-grid">${ALBUMS.slice((page - 1) * size, page * size).map(a => `<li><a href="album-view.html?a=${a.id}"><span class="cover"><img src="${a.photos[0]}" alt=""><span class="cnt">사진 ${a.photos.length}장</span></span>
+    C.innerHTML = `<ul class="album-grid">${ALBUMS.slice((page - 1) * size, page * size).map(a => `<li><a href="album-view.html?a=${a.id}"><span class="cover"><img src="${a.photos[0]}" alt=""><span class="cnt"><span class="ms">photo_library</span>${a.photos.length}</span></span>
       <span class="al-t">${a.title}</span><span class="al-d">${a.date}</span></a></li>`).join('')}</ul>` + pager(ALBUMS.length, size, page);
   }
   if (file === 'album-view.html') {
@@ -309,21 +261,13 @@
     let y = now.getFullYear(), m = now.getMonth(), view = 'cal';
     if (!EVENTS.some(e => e.date.startsWith(y + '-' + pad(m + 1)))) { y = 2026; m = 10; }   // 시안 자료가 있는 달로
     const inDay = (e, ds) => e.end ? (ds >= e.date && ds <= e.end) : e.date === ds;
-    let monthEvents = [];
     function draw() {
       const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), ym = y + '-' + pad(m + 1);
-      monthEvents = EVENTS.filter(e => e.date <= ym + '-' + pad(days) && (e.end || e.date) >= ym + '-01');
-      for (let d = 1 + (6 - first); d <= days; d += 7) {
-        const date = ym + '-' + pad(d);
-        if (!monthEvents.some(e => e.date === date && e.title === '모닥불 기도회')) {
-          monthEvents.push({ date, title: '모닥불 기도회', place: '토요일 오후 7:30 · 교회 마당' });
-        }
-      }
-      const evs = monthEvents.sort((a, b) => a.date.localeCompare(b.date));
+      const evs = EVENTS.filter(e => e.date.startsWith(ym) || (e.end && e.end.startsWith(ym))).sort((a, c) => a.date.localeCompare(c.date));
       let cells = '';
       for (let i = 0; i < first; i++) cells += '<div class="cd blank"></div>';
       for (let d = 1; d <= days; d++) {
-        const ds = ym + '-' + pad(d), wd = (first + d - 1) % 7, es = monthEvents.filter(e => inDay(e, ds));
+        const ds = ym + '-' + pad(d), wd = (first + d - 1) % 7, es = EVENTS.filter(e => inDay(e, ds));
         cells += `<div class="cd${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}${ds === todayS ? ' today' : ''}${es.length ? ' has' : ''}"${es.length ? ` role="button" tabindex="0" data-action="day-open" data-date="${ds}" aria-label="${m + 1}월 ${d}일 일정 ${es.length}건"` : ''}><span class="n">${d}</span>${es.map(e => `<span class="ev-chip">${esc(e.title)}</span>`).join('')}</div>`;
       }
       const rest = (7 - (first + days) % 7) % 7;
@@ -338,7 +282,7 @@
     Actions['cal-view'] = el => { view = el.dataset.v; draw(); };
     Actions['cal-today'] = () => { y = now.getFullYear(); m = now.getMonth(); draw(); };
     Actions['day-open'] = el => {
-      const ds = el.dataset.date, es = monthEvents.filter(e => inDay(e, ds)), d = new Date(ds + 'T00:00');
+      const ds = el.dataset.date, es = EVENTS.filter(e => inDay(e, ds)), d = new Date(ds + 'T00:00');
       Modal.open({ title: `${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]}) 일정`, body: `<ul class="modal-ev">${es.map(e => `<li><b>${esc(e.title)}</b><span>${e.end ? e.date.slice(5).replace('-', '.') + ' ~ ' + e.end.slice(5).replace('-', '.') + ' · ' : ''}${e.place}</span></li>`).join('')}</ul>`, actions: [{ label: '닫기', value: true }] });
     };
     draw();

@@ -154,6 +154,7 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 
 /* ---------- mobile ---------- */
 @media (max-width:1024px){
+  .hero{min-height:440px;background-image:linear-gradient(90deg,rgba(255,255,255,.92),rgba(255,255,255,.76) 220px,rgba(255,255,255,.62) 445px,rgba(255,255,255,0) 580px),url(img/hero-exterior.jpg)}
   .hd-in{height:68px}
   .logo-mark{font-size:30px}
   .logo-txt{font-size:22px}
@@ -172,9 +173,7 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 }
 @media (max-width:720px){
   .wrap{padding:0 20px}
-  .hero{display:block;aspect-ratio:auto;height:auto;background:#dfe7ee}
-  .hero::before{content:"";display:block;aspect-ratio:1672/941;background:url(img/hero-exterior.jpg) center/cover no-repeat}
-  .hero-in{padding-top:28px;padding-bottom:40px}
+  .hero{aspect-ratio:auto}
   .hero-eyebrow{font-size:12px;margin-bottom:8px}
   .hero-title{font-size:44px}
   .hero-title::after{margin:18px 0 16px;width:44px}

@@ -364,15 +364,15 @@
     if (!f || !f.to || TYPE_IDS.indexOf(f.type) < 0) return null;
     if (f.to !== 'admin' && !prefsOf(f.to)[f.type]) return null;
     const list = read(K.notifs, []), n = { id: 'n' + uid(), to: f.to, type: f.type, text: String(f.text || ''), link: f.link || '', at: Date.now(), read: false };
-    list.push(n);
-    return write(K.notifs, list) ? n : null;
+    list.push(n); if (list.length > 300) list.splice(0, list.length - 300);
+    write(K.notifs, list); return n;
   }
   function notifyAll(type, text, link) { const m = me(); users().forEach(u => { if (!m || u.id !== m.id) notify({ to: u.id, type, text, link }); }); }
   function myNotifs(o) {
     const m = me(); if (!m) return [];
     const p = prefsOf(m.id), adm = isAdmin();
-    let l = read(K.notifs, []).filter(n => n.to === m.id || (n.to === 'admin' && adm)).sort((a, b) => b.at - a.at);
-    if (o && o.unreadOnly) l = l.filter(n => !n.read && (n.to !== 'admin' || p[n.type]));
+    let l = read(K.notifs, []).filter(n => n.to === m.id || (n.to === 'admin' && adm && p[n.type])).sort((a, b) => b.at - a.at);
+    if (o && o.unreadOnly) l = l.filter(n => !n.read);
     return l;
   }
   const unreadCount = () => myNotifs({ unreadOnly: true }).length;

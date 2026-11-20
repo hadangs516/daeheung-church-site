@@ -144,8 +144,9 @@
 .ed{min-height:360px;padding:22px;border:1px solid #cfd5e2;border-top:0;border-radius:0 0 12px 12px;background:#fff;outline:0}
 .ed:focus{border-color:var(--navy)}
 .ed:empty::before{content:attr(data-placeholder);color:#9aa0ad}
-.wr-hint{display:flex;gap:6px;align-items:flex-start;margin-top:10px;font-size:14.5px;color:var(--muted);line-height:1.5}
-.wr-hint .ms{font-size:18px;flex:none}
+.wr-hint{display:block;margin-top:10px;font-size:14.5px;color:var(--muted);line-height:1.5}
+.wr-hint .ms{font-size:18px;vertical-align:text-bottom;margin-right:6px}
+.wr-hint [data-usage]{display:block;margin-top:4px}
 
 /* ---------- 글 아래 버튼 · 댓글 · 다른 글 ---------- */
 .post-actions{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:24px 0 8px}
@@ -397,11 +398,10 @@
 .pw-meter b:empty{display:none}
 
 /* 생년월일 직접 입력 */
-.birth-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.bi{display:flex;align-items:center;gap:6px;font-size:17px;font-weight:600;color:var(--ink)}
-.bi input{width:5.4em;text-align:center;padding:13px 8px}
-.bi-y input{width:6.6em}
-.bi-m input,.bi-d input{width:4.6em}
+.birth-in{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:8px;max-width:360px}
+.birth-in .bi{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:4px;min-width:0;font-size:17px;font-weight:600;color:var(--ink)}
+.birth-in .bi input{width:100%;min-width:0;padding:13px 4px;text-align:center}
+.birth-in input[type="hidden"]{display:none}
 
 /* 소속 칩 · 선택 */
 .aff{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid #cfd5e2;border-radius:10px;padding:10px 12px;background:#fff}

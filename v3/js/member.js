@@ -430,7 +430,7 @@
     if (!B || rule === 'none') return stop('block', '이 게시판에는 글쓰기가 없습니다.');
     if (rule === 'admin' && !Store.isAdmin()) return stop('lock', '이 게시판은 교회에서만 글을 올릴 수 있습니다.', '<p class="fld-h" style="text-align:center">시험 중에는 마이페이지에서 “시험용 관리자 모드”를 켜면 쓸 수 있습니다.</p><div class="btn-row center" style="margin-top:12px"><a class="btn" href="mypage.html">마이페이지로</a></div>');
     let post = null;
-    if (editId) { post = Store.getPost(editId); if (!post || !(Store.isMine(post.owner) || Store.isAdmin())) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
+    if (editId) { post = Store.getPost(editId); if (!post || !Store.isMine(post.owner)) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
     const who = m ? esc(m.name) : '게스트';
     C.innerHTML = `<form class="wr" data-action="post-save" data-board="${board}" data-edit="${post ? post.id : ''}" novalidate>
       <p class="wr-as"><span class="ms">edit_note</span>${B.title} · 작성자 <b>${who}</b>${m ? '' : ' <i class="opt">(로그인하지 않아 게스트로 표시됩니다)</i>'}</p>

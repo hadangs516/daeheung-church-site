@@ -183,14 +183,12 @@
   function drawMy(C) {
     C = C || $('#content'); const u = Store.me(); if (!u) return;
     const admin = Store.isAdmin(), cnt = (admin || Store.isLeader()) ? approveCount() : 0;
-    const tabs = [['info', '내 정보'], ['activity', '내 활동']];
-    const canApprove = admin || Store.isLeader();
-    if (TAB === 'approve' && !canApprove) TAB = 'info';
+    const tabs = [['info', '내 정보'], ['activity', '내 활동']].concat(admin || Store.isLeader() ? [['approve', '승인 관리' + (cnt ? ' (' + cnt + ')' : '')]] : []);
+    if (TAB === 'approve' && tabs.length < 3) TAB = 'info';
     const on = (TAB === 'account' || TAB === 'settings') ? 'info' : TAB;
     const aff = Store.groupText && (u.groups || []).filter(g => g.status === 'approved').map(g => Store.groupText(g));
     C.innerHTML = `<div class="mp">
-      <aside class="mp-side"><div class="mp-me">${avatar(u)}<div class="mp-me-t"><b>${esc(u.name)}</b><span>${esc(u.rank)}${aff.length ? ' · ' + esc(aff.join(' · ')) : ''}</span>${badgeHtml(u)}</div></div>
-        ${canApprove ? `<a class="approve-link" href="#approve" data-action="mp-tab" data-tab="approve"${TAB === 'approve' ? ' aria-current="page"' : ''}>승인 관리${cnt ? ' (' + cnt + ')' : ''}</a>` : ''}</aside>
+      <aside class="mp-side"><div class="mp-me">${avatar(u)}<div class="mp-me-t"><b>${esc(u.name)}</b><span>${esc(u.rank)}${aff.length ? ' · ' + esc(aff.join(' · ')) : ''}</span>${badgeHtml(u)}</div></div></aside>
       <section class="mp-main"><div class="tabs" role="tablist">${tabs.map(t => `<a href="#${t[0]}" role="tab" data-action="mp-tab" data-tab="${t[0]}"${t[0] === on ? ' class="on" aria-selected="true"' : ''}>${t[1]}</a>`).join('')}</div>
         <div class="mp-panel" data-panel="${TAB}">${panel(u)}</div></section>
       <aside class="mp-test" aria-label="시험용 도구"><p class="mp-test-t"><span class="ms">science</span>시험용 도구</p>
@@ -281,7 +279,7 @@
       h = `<p class="set-lead">받고 싶은 알림만 켜 두세요. 종류별로 끄고 켤 수 있습니다.</p><ul class="set-list sw-list">${(Store.NOTIF_TYPES || []).map(t => `<li><div><b>${t.label}</b><p>${t.desc}</p></div>
           <label class="switch"><input type="checkbox" role="switch" data-action="notif-pref" data-type="${t.id}"${pf[t.id] !== false ? ' checked' : ''} aria-label="${t.label} 알림"><span class="sw"></span></label></li>`).join('')}</ul>
         <h4 class="set-h">알림 기록 <span class="muted">(알림함에서 지워져도 여기에 남습니다)</span></h4>
-        ${hist.length ? `<ul class="nh-list">${hist.map(n => `<li class="${n.read ? '' : 'unread'}"><a href="${esc(n.link || '#')}" data-action="nh-go" data-id="${n.id}"><span class="nh-t">${esc(n.text)}</span><span class="nh-d">${dotTime(n.at)}${n.read ? '' : ' · 안 읽음'}</span></a></li>`).join('')}</ul>` : '<p class="empty" style="padding:36px 0">아직 받은 알림이 없습니다.</p>'}`;
+        ${hist.length ? `<ul class="nh-list">${hist.slice(0, 80).map(n => `<li class="${n.read ? '' : 'unread'}"><a href="${esc(n.link || '#')}" data-action="nh-go" data-id="${n.id}"><span class="nh-t">${esc(n.text)}</span><span class="nh-d">${dotTime(n.at)}${n.read ? '' : ' · 안 읽음'}</span></a></li>`).join('')}</ul>` : '<p class="empty" style="padding:36px 0">아직 받은 알림이 없습니다.</p>'}`;
     } else if (SUB === 'view') {
       h = `<ul class="set-list sw-list"><li><div><b>글자 크게 보기</b><p>홈페이지의 글자와 버튼을 조금 더 크게 보여 드려요.</p></div><label class="switch"><input type="checkbox" role="switch" data-action="big-text"${Store.prefs().bigText ? ' checked' : ''} aria-label="글자 크게 보기"><span class="sw"></span></label></li></ul>
         <div class="acct"><div class="acct-row"><div><b>시험 데이터 전체 초기화</b><p>이 브라우저에 저장된 모든 시험 계정·글·댓글을 지웁니다.</p></div><button type="button" class="btn line" data-action="reset-all">전체 초기화</button></div>
@@ -418,7 +416,7 @@
     const sub = $('#sub'); if (!sub) return;
     if (!$('#content') || !$('.mb-wrap')) {
       document.querySelectorAll('.sv, .snb-m').forEach(n => n.remove());
-      sub.insertAdjacentHTML('beforebegin', '<section class="sv" style="background-image:url(img/hero-interior.jpg)"><div class="wrap sv-in"><div class="sv-label"><h1 class="sv-title">프로필</h1><nav class="crumb" aria-label="현재 위치"><a href="home.html">홈</a><span>회원</span><b aria-current="page">프로필</b></nav></div></div></section>');
+      sub.insertAdjacentHTML('beforebegin', '<section class="sv" style="background-image:url(img/hero-interior.jpg)"><div class="wrap sv-in"><p class="sv-group">회원</p><h1 class="sv-title">프로필</h1></div></section>');
       sub.innerHTML = '<div class="wrap mb-wrap wide"><div id="content"></div></div>';
     }
     const C = $('#content'); if (!C.firstElementChild) profile(C);
@@ -432,7 +430,7 @@
     if (!B || rule === 'none') return stop('block', '이 게시판에는 글쓰기가 없습니다.');
     if (rule === 'admin' && !Store.isAdmin()) return stop('lock', '이 게시판은 교회에서만 글을 올릴 수 있습니다.', '<p class="fld-h" style="text-align:center">시험 중에는 마이페이지에서 “시험용 관리자 모드”를 켜면 쓸 수 있습니다.</p><div class="btn-row center" style="margin-top:12px"><a class="btn" href="mypage.html">마이페이지로</a></div>');
     let post = null;
-    if (editId) { post = Store.getPost(editId); if (!post || !(Store.isMine(post.owner) || Store.isAdmin())) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
+    if (editId) { post = Store.getPost(editId); if (!post || !Store.isMine(post.owner)) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
     const who = m ? esc(m.name) : '게스트';
     C.innerHTML = `<form class="wr" data-action="post-save" data-board="${board}" data-edit="${post ? post.id : ''}" novalidate>
       <p class="wr-as"><span class="ms">edit_note</span>${B.title} · 작성자 <b>${who}</b>${m ? '' : ' <i class="opt">(로그인하지 않아 게스트로 표시됩니다)</i>'}</p>
@@ -441,12 +439,12 @@
       <div class="ed-wrap">
         <div class="ed-tb" role="toolbar" aria-label="글 꾸미기">
           <span class="tb-g"><button type="button" class="tb-img" data-action="img-pick" aria-label="사진 넣기" title="사진 넣기"><span class="ms">add_photo_alternate</span><span class="lbl">사진</span></button><input type="file" accept="image/*" multiple hidden data-action="img-file"></span>
-          <div class="tb-scroll"><span class="tb-g"><button type="button" data-action="fmt" data-cmd="bold" aria-label="굵게" title="굵게"><span class="ms">format_bold</span></button>
+          <span class="tb-g"><button type="button" data-action="fmt" data-cmd="bold" aria-label="굵게" title="굵게"><span class="ms">format_bold</span></button>
           <button type="button" data-action="fmt" data-cmd="italic" aria-label="기울임" title="기울임"><span class="ms">format_italic</span></button>
           <button type="button" data-action="fmt" data-cmd="underline" aria-label="밑줄" title="밑줄"><span class="ms">format_underlined</span></button>
           <button type="button" data-action="fmt" data-cmd="strikeThrough" aria-label="취소선" title="취소선"><span class="ms">strikethrough_s</span></button></span>
           <span class="tb-g" aria-label="글자 크기"><button type="button" class="sz s" data-action="fmt-size" data-size="s" aria-label="글자 작게" title="작게">가</button><button type="button" class="sz n" data-action="fmt-size" data-size="n" aria-label="글자 보통" title="보통">가</button><button type="button" class="sz l" data-action="fmt-size" data-size="l" aria-label="글자 크게" title="크게">가</button><button type="button" class="sz xl" data-action="fmt-size" data-size="xl" aria-label="글자 아주 크게" title="아주 크게">가</button></span>
-          <span class="tb-g" aria-label="글자 색">${[['ink', '기본'], ['red', '빨강'], ['orange', '주황'], ['green', '초록'], ['blue', '파랑'], ['gray', '회색']].map(c => `<button type="button" class="sw-c c-${c[0]}" data-action="fmt-color" data-color="${c[0]}" aria-label="글자색 ${c[1]}" title="${c[1]}"><i></i></button>`).join('')}</span></div>
+          <span class="tb-g" aria-label="글자 색">${[['ink', '기본'], ['red', '빨강'], ['orange', '주황'], ['green', '초록'], ['blue', '파랑'], ['gray', '회색']].map(c => `<button type="button" class="sw-c c-${c[0]}" data-action="fmt-color" data-color="${c[0]}" aria-label="글자색 ${c[1]}" title="${c[1]}"><i></i></button>`).join('')}</span>
         </div>
         <div class="ed" id="ed" contenteditable="true" role="textbox" aria-multiline="true" aria-label="본문" data-placeholder="내용을 입력하세요. 사진은 한 줄에 한 장씩 크게 들어갑니다."></div>
       </div>

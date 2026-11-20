@@ -200,12 +200,10 @@
     const byAv = who.href ? `<a class="by-av" href="${who.href}" aria-label="${nm} 프로필 보기">${UI.avatar(who.card, p.author)}</a>` : `<span class="by-av">${UI.avatar(null, p.author)}</span>`;
     const byNm = who.href ? `<a class="by-name" href="${who.href}">${nm}</a>` : `<span class="by-name">${nm}</span>`;
     Actions['post-more'] = btn => UI.menu(btn, [
-      canDel && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
+      mine && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
       canDel && { label: '삭제', icon: 'delete', danger: true, onClick: () => Actions['post-del']({ dataset: { id, board: b } }) },
-      (mine || canDel) && { sep: true },
-      { label: '링크 복사', icon: 'link', onClick: () => { UI.copy(location.href); toast('주소를 복사했습니다'); } },
-      { label: '공유하기', icon: 'share', onClick: () => Actions.share({ dataset: { title: p.title } }) },
-      !mine && { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'post', id: b + ':' + id, label: p.title }) }
+      canDel && { sep: true },
+      { label: '신고하기', icon: 'flag', danger: true, onClick: () => UI.report({ kind: 'post', id: b + ':' + id, label: p.title }) }
     ]);
     C.innerHTML = `<article class="post" data-img-ctx="post:${b}:${id}" data-img-label="${esc(p.title)}"><header class="post-hd"><h3>${esc(p.title)}</h3>
         <div class="post-tools"><button type="button" class="share-btn" data-action="share" data-title="${esc(p.title)}" aria-label="공유"><span class="ms">share</span></button>
@@ -213,7 +211,7 @@
         <div class="post-by">${byAv}<div class="by-tx">${byNm}<p class="post-meta"><span>${p.date}</span><span>조회 ${p.views}</span>${B.bulletin ? '' : `<span>댓글 <b data-cmt-count>${p.comments}</b></span>`}${U && U.edited ? '<span>수정됨</span>' : ''}</p></div></div></header>
         <div class="post-body">${body}</div></article>
       <div class="post-actions"><span class="pa-l">
-        ${canDel ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
+        ${mine ? `<a class="btn line" href="write.html?b=${b}&edit=${id}"><span class="ms">edit</span>수정</a>` : ''}${canDel ? `<button type="button" class="btn line danger-t" data-action="post-del" data-id="${id}" data-board="${b}"><span class="ms">delete</span>삭제</button>` : ''}</span>
         <a class="btn" href="board.html?b=${b}"><span class="ms">list</span>목록</a></div>
       ${B.bulletin ? '' : '<div id="cmt"></div>'}
       ${others.length ? `<section class="related" aria-label="같은 게시판의 다른 글"><h3 class="rel-h">${B.title}의 다른 글</h3><ul class="rel-list">${others.map(x => `<li><a href="board-view.html?b=${b}&id=${x.id}"><span class="rel-t">${esc(x.title)}${x.comments ? `<span class="cmt-n">(${x.comments})</span>` : ''}</span><span class="rel-m">${esc(x.author)}<i></i>${x.date}</span></a></li>`).join('')}</ul></section>` : ''}`;

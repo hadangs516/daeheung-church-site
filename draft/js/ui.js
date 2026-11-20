@@ -8,18 +8,8 @@
   const $ = (s, r = document) => r.querySelector(s);
   const Actions = window.Actions = {};
 
-  // 아이콘 글꼴을 받기 전에도 메뉴 이름이 길게 새거나 빈 버튼이 생기지 않게 한다.
-  if (document.fonts) {
-    const root = document.documentElement;
-    root.classList.add('text-icons');
-    document.fonts.load('24px "Material Symbols Rounded"').then(faces => {
-      if (faces.length) root.classList.remove('text-icons');
-    }).catch(() => {});
-  }
-
   /* ---------- 알림 ---------- */
   window.toast = (msg, icon) => {
-    document.querySelector('.toast')?.remove();
     const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
     t.dataset.icon = icon || 'check_circle'; t.innerHTML = '<span class="ms">' + (icon || 'check_circle') + '</span><span></span>'; t.lastChild.textContent = msg;
     document.body.append(t); requestAnimationFrame(() => t.classList.add('show'));
@@ -82,21 +72,22 @@
       const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
       let left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8), top = r.bottom + 6;
       if (top + h > innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
-      pop.style.left = left + 'px'; pop.style.top = Math.max(8, Math.min(top, innerHeight - h - 8)) + 'px';
-      addEventListener('scroll', onScroll, true);
+      pop.style.left = left + 'px'; pop.style.top = top + 'px';
+      addEventListener('resize', close); addEventListener('scroll', onScroll, true);
     }
     document.addEventListener('keydown', key, true);
-    addEventListener('resize', close);
     const f = pop.querySelector('.menu-it'); f && f.focus({ preventScroll: true });
     return close;
   };
   /* 작성자 사진: 사진이 있으면 사진, 이름만 있으면 머리글자 원, 익명·게스트는 기본 사진 */
+  const AV_COLORS = ['#2d5fb8', '#2f8a4f', '#b8613a', '#7a4fb0', '#1f7f8c', '#a8455f'];
   UI.avatar = (card, name, cls) => {
     const c = cls ? ' ' + cls : '';
     if (card && card.avatar) return '<span class="av' + c + '"><img src="' + escH(card.avatar) + '" alt=""></span>';
     const n = (card && card.name) || '';
     if (!n || n === '익명' || n === '게스트') return '<span class="av none' + c + '"><span class="ms">person</span></span>';
-    return '<span class="av ini' + c + '">' + escH([...n][0]) + '</span>';
+    let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) % 997;
+    return '<span class="av ini' + c + '" style="background:' + AV_COLORS[h % AV_COLORS.length] + '">' + escH([...n][0]) + '</span>';
   };
   UI.profileHref = id => 'profile.html?u=' + encodeURIComponent(id);
   /* id가 있으면 {card, href}, 익명·게스트는 {card:null, href:''} */
@@ -126,20 +117,6 @@
     return p.then(ok => { if (ok !== true) return false; Store.report({ kind: o.kind, id: o.id, reason, text: text.trim(), link: o.link || (location.pathname.split('/').pop() + location.search), label: o.label || '' }); toast('신고해 주셔서 고맙습니다. 관리자가 확인할게요.', 'info'); return true; });
   };
 
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Tab') return;
-    const layers = document.querySelectorAll('.menu-pop,.np,.sheet,.modal-box,.lightbox');
-    const layer = layers[layers.length - 1];
-    if (!layer) return;
-    const controls = [...layer.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')].filter(el => el.getClientRects().length);
-    if (!controls.length) return;
-    const first = controls[0], last = controls[controls.length - 1];
-    if (!layer.contains(document.activeElement) || (e.shiftKey ? document.activeElement === first : document.activeElement === last)) {
-      e.preventDefault();
-      (e.shiftKey ? last : first).focus();
-    }
-  });
-
   /* ---------- 클릭·입력 연결 (data-action) ---------- */
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-action]'); if (!el || /^(INPUT|SELECT|TEXTAREA|FORM)$/.test(el.tagName)) return;
@@ -148,7 +125,7 @@
   document.addEventListener('change', e => { const el = e.target.closest('[data-action]'); if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && Actions[el.dataset.action]) Actions[el.dataset.action](el, e); });
   document.addEventListener('input', e => { const el = e.target.closest && e.target.closest('[data-oninput]'); if (el && Actions[el.dataset.oninput]) Actions[el.dataset.oninput](el, e); });
   document.addEventListener('submit', e => { const f = e.target.closest('form[data-action]'); if (f && Actions[f.dataset.action]) { e.preventDefault(); Actions[f.dataset.action](f, e); } });
-  document.addEventListener('keydown', e => { const el = e.target.closest && e.target.closest('[role="button"][data-action],[role="button"][data-view]'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); el.click(); } });
+  document.addEventListener('keydown', e => { const el = e.target.closest && e.target.closest('[role="button"][data-action]'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); el.click(); } });
   /* 주소 복사 (공유) */
   document.addEventListener('click', e => {
     const c = e.target.closest('[data-copy]'); if (!c) return; e.preventDefault();
@@ -162,14 +139,12 @@
      휴대폰(터치 기기)은 기본 공유 창(navigator.share), 그 밖(PC 등)은 아래 하단 시트를 띄운다. */
   const Sheet = window.Sheet = {
     open(html) {
-      const trigger = document.activeElement;
       const bg = document.createElement('div'); bg.className = 'sheet-bg'; bg.setAttribute('role', 'dialog'); bg.setAttribute('aria-modal', 'true'); bg.setAttribute('aria-label', '공유');
-      bg.innerHTML = '<div class="sheet"><div class="sheet-heading"><h2>공유하기</h2><button type="button" data-sheet-close aria-label="공유 창 닫기">닫기</button></div>' + html + '</div>';
-      const close = () => { document.removeEventListener('keydown', key); bg.classList.remove('open'); setTimeout(() => bg.remove(), 280); trigger?.focus({ preventScroll: true }); };
+      bg.innerHTML = '<div class="sheet"><span class="sheet-grip"></span>' + html + '</div>';
+      const close = () => { document.removeEventListener('keydown', key); bg.classList.remove('open'); setTimeout(() => bg.remove(), 280); };
       const key = e => { if (e.key === 'Escape') close(); };
       bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-sheet-close]')) close(); });
       document.addEventListener('keydown', key); document.body.append(bg); requestAnimationFrame(() => requestAnimationFrame(() => bg.classList.add('open')));
-      bg.querySelector('[data-sheet-close]').focus({ preventScroll: true });
       return close;
     }
   };
@@ -181,18 +156,21 @@
       try { await navigator.share({ title, text: title, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }   // 실패하면 아래 시트로
     }
     const enc = encodeURIComponent, body = title + ' ' + url;
-    Sheet.open('<div class="sheet-head"><div class="sheet-t"><b>' + escH(title) + '</b><span>' + escH(url) + '</span></div></div>' +
-      '<button type="button" class="sheet-copy" data-action="share-copy" data-sheet-close>복사</button>' +
+    Sheet.open('<div class="sheet-head"><span class="sheet-ic"><span class="ms">link</span></span><div class="sheet-t"><b>' + escH(title) + '</b><span>' + escH(url) + '</span></div></div>' +
+      '<button type="button" class="sheet-copy" data-action="share-copy">복사</button>' +
       '<div class="sheet-row"><button type="button" class="k" data-action="soon" data-sheet-close><i><span class="ms">chat</span></i>카카오톡</button>' +
       '<a class="s" href="sms:?&body=' + enc(body) + '" data-sheet-close><i><span class="ms">sms</span></i>문자</a>' +
       '<a class="e" href="mailto:?subject=' + enc(title) + '&body=' + enc(body) + '" data-sheet-close><i><span class="ms">mail</span></i>이메일</a>' +
-      '<button type="button" class="c" data-action="share-copy" data-sheet-close><i><span class="ms">content_copy</span></i>주소 복사</button></div>');
+      '<button type="button" class="c" data-action="share-copy"><i><span class="ms">content_copy</span></i>주소 복사</button></div>');
     document.querySelector('.sheet').dataset.url = url;
   };
-  Actions['share-copy'] = el => { copyText(el.closest('.sheet').dataset.url || location.href); toast('주소를 복사했습니다'); };
+  Actions['share-copy'] = el => { copyText(el.closest('.sheet').dataset.url || location.href); toast('주소를 복사했습니다'); const b = el.closest('.sheet-bg'); b.classList.remove('open'); setTimeout(() => b.remove(), 280); };
 
   /* ---------- 맨 위로 ---------- */
+  const top = document.createElement('button'); top.className = 'to-top'; top.setAttribute('aria-label', '맨 위로'); top.setAttribute('data-action', 'to-top');
+  top.innerHTML = '<span class="ms">arrow_upward</span>'; document.body.append(top);
   Actions['to-top'] = () => scrollTo({ top: 0, behavior: 'smooth' });
+  addEventListener('scroll', () => top.classList.toggle('show', scrollY > 500), { passive: true });
 
   /* ---------- 사진 크게 보기 (같은 묶음의 사진은 좌우로 넘김) ---------- */
   document.addEventListener('click', e => {
@@ -200,17 +178,17 @@
     const group = t.closest('[data-gallery]'), all = group ? [...group.querySelectorAll('[data-view]')] : [t];
     const srcOf = x => x.dataset.src || x.getAttribute('src');
     let i = Math.max(0, all.indexOf(t));
-    const lb = document.createElement('div'); lb.className = 'lightbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', '사진 크게 보기');
+    const lb = document.createElement('div'); lb.className = 'lightbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true');
     const draw = () => {
       lb.innerHTML = '<button class="lb-x" data-lb="close" aria-label="닫기"><span class="ms">close</span></button>' +
         '<button class="lb-more" data-lb="more" aria-label="사진 메뉴 (저장·공유·신고)" aria-haspopup="menu" aria-expanded="false"><span class="ms">more_horiz</span></button>' +
         (all.length > 1 ? '<button class="lb-nav prev" data-lb="prev" aria-label="이전 사진"><span class="ms">chevron_left</span></button><button class="lb-nav next" data-lb="next" aria-label="다음 사진"><span class="ms">chevron_right</span></button>' : '') +
-        '<img src="' + escH(srcOf(all[i])) + '" alt="' + escH(all[i].querySelector('img')?.alt || all[i].getAttribute('alt') || ('사진 ' + (i + 1))) + '"><div class="lb-bar">' + (all.length > 1 ? '<span>' + (i + 1) + ' / ' + all.length + '</span>' : '') + '</div>';
+        '<img src="' + srcOf(all[i]) + '" alt=""><div class="lb-bar">' + (all.length > 1 ? '<span>' + (i + 1) + ' / ' + all.length + '</span>' : '') + '</div>';
     };
     const busy = () => document.querySelector('.menu-pop,.modal,.sheet-bg');   // 메뉴·확인창이 떠 있으면 사진 창은 가만히
     const key = ev => { if (busy()) return; if (ev.key === 'Escape') close(); if (ev.key === 'ArrowLeft') go(-1); if (ev.key === 'ArrowRight') go(1); };
-    const close = () => { lb.remove(); document.removeEventListener('keydown', key); t.focus({ preventScroll: true }); };
-    const go = d => { if (all.length > 1) { i = (i + d + all.length) % all.length; draw(); lb.querySelector(d < 0 ? '.prev' : '.next').focus({ preventScroll: true }); } };
+    const close = () => { lb.remove(); document.removeEventListener('keydown', key); };
+    const go = d => { if (all.length > 1) { i = (i + d + all.length) % all.length; draw(); } };
     const more = btn => {
       const src = srcOf(all[i]), ctx = document.querySelector('[data-img-ctx]'), cx = ctx ? ctx.dataset.imgCtx : 'page:' + location.pathname.split('/').pop() + location.search;
       UI.menu(btn, [
@@ -224,6 +202,6 @@
       const b = ev.target.closest('[data-lb]');
       if (b) { if (b.dataset.lb === 'close') close(); else if (b.dataset.lb === 'more') more(b); else go(b.dataset.lb === 'next' ? 1 : -1); } else if (ev.target === lb) close();
     });
-    document.addEventListener('keydown', key); draw(); document.body.append(lb); lb.querySelector('.lb-x').focus({ preventScroll: true });
+    document.addEventListener('keydown', key); draw(); document.body.append(lb);
   });
 })();
