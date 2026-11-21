@@ -1,6 +1,6 @@
 /* 시안용 가짜 데이터 (실제 성도 이름·사진 없음) */
 // x.y.z: 주 버전 = 사이트 구조 세대(v1, v2, v4(폐기), v3는 네 번째 구조 → 4), 부 버전 = 기능 업데이트, 패치 = 작은 수정.
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.2.0';
 const CHURCH = {
   name: '포항대흥교회',
   address: '경북 포항시 남구 희망대로 466',
@@ -30,7 +30,7 @@ const MENU = [
   ]},
   { label: '성도의 교제', items: [
     ['공지사항', 'board.html?b=notice'], ['새가족소개', 'board.html?b=newfamily'], ['포토앨범', 'album.html'],
-    ['자유게시판', 'board.html?b=freeboard'], ['남전도회', 'board.html?b=men'], ['여전도회', 'board.html?b=women'],
+    ['자유게시판', 'board.html?b=freeboard'], ['기도 제목 나눔', 'board.html?b=prayer'], ['남전도회', 'board.html?b=men'], ['여전도회', 'board.html?b=women'],
     ['행사·집회 안내', 'board.html?b=events']
   ]}
 ];
@@ -39,6 +39,7 @@ const GROUP_IMG = ['img/hero-exterior.jpg', 'img/hero-interior.jpg', 'img/album-
 
 /* ---------- 게시판 ---------- */
 const BOARDS = {
+  prayer: { title: '기도 제목 나눔', titles: ['어머니 수술이 잘 되도록', '취업 준비 중입니다', '가정의 평안을 위해', '이웃의 회복을 위해', '새 학기를 잘 시작하도록', '마음에 쉼을 얻도록', '감사의 기도를 나눕니다'], anon: true },
   notice:    { title: '공지사항', titles: ['추수감사주일 안내','성탄절 찬양대 연습 일정','겨울 성경학교 교사 모집','교회 주차장 공사 안내','새가족 환영회 안내','가을 대심방 일정 안내','2027년 교회 달력 신청','교회 차량 운행 시간 변경','제직회 모임 안내','장학금 신청 안내','교회 도서실 이용 안내','여름 수련회 결과 보고'], pinned: 2, file: true },
   bulletin:  { title: '주보', titles: ['2026년 11월 15일 주보','2026년 11월 8일 주보','2026년 11월 1일 주보','2026년 10월 25일 주보','2026년 10월 18일 주보','2026년 10월 11일 주보','2026년 10월 4일 주보','2026년 9월 27일 주보'], bulletin: true },
   dawn:      { title: '새벽기도회', titles: ['11월 셋째 주 새벽기도 말씀 (시편 23편)','11월 둘째 주 새벽기도 말씀 (시편 91편)','11월 첫째 주 새벽기도 말씀 (빌립보서 4장)','10월 넷째 주 새벽기도 말씀 (요한복음 15장)','10월 셋째 주 새벽기도 말씀 (마태복음 6장)','특별새벽기도회 안내','10월 둘째 주 새벽기도 말씀 (로마서 8장)','10월 첫째 주 새벽기도 말씀 (이사야 40장)'] },
@@ -52,7 +53,7 @@ const BOARDS = {
   elder:     { title: '노인대학', titles: ['2학기 종강식 안내','가을 소풍 다녀왔습니다','건강 체조 시간 사진','한글 교실 작품 전시','노인대학 봉사자 모집','2학기 개강 안내'], photo: true }
 };
 /* 글쓰기 권한: all=누구나(게스트 포함) / admin=관리자 모드에서만 / none=글쓰기 없음 */
-const WRITE_RULE = { freeboard: 'all', men: 'all', women: 'all', notice: 'admin', dawn: 'admin', newfamily: 'admin', events: 'admin', domestic: 'admin', overseas: 'admin', elder: 'admin', bulletin: 'none' };
+const WRITE_RULE = { prayer: 'all', freeboard: 'all', men: 'all', women: 'all', notice: 'admin', dawn: 'admin', newfamily: 'admin', events: 'admin', domestic: 'admin', overseas: 'admin', elder: 'admin', bulletin: 'none' };
 const RANKS = ['목사','전도사','장로','안수집사','권사','서리집사','성도','새가족','청년','학생'];
 const BOARD_DATES = ['2026.11.15','2026.11.12','2026.11.08','2026.11.03','2026.10.29','2026.10.25','2026.10.18','2026.10.11','2026.10.04','2026.09.27','2026.09.20','2026.09.13'];
 const PHOTOS = ['img/album-1.jpg','img/album-2.jpg','img/album-3.jpg','img/album-4.jpg','img/album-5.jpg','img/hero-interior.jpg','img/hero-exterior.jpg'];
@@ -60,8 +61,10 @@ const PHOTOS = ['img/album-1.jpg','img/album-2.jpg','img/album-3.jpg','img/album
 function boardPosts(b) {
   const B = BOARDS[b]; if (!B) return [];
   return B.titles.map((t, i) => ({
-    id: i + 1, title: t, date: BOARD_DATES[i % BOARD_DATES.length],
-    pinned: i < (B.pinned || 0), author: B.anon ? '익명' : (b === 'notice' || b === 'bulletin' ? '교회 사무실' : '관리자'),
+    id: i + 1, title: t, date: B.bulletin ? t.replace(/(\d{4})년 (\d{1,2})월 (\d{1,2})일 주보/, (_, y, m, d) => y + '.' + m.padStart(2, '0') + '.' + d.padStart(2, '0')) : BOARD_DATES[i % BOARD_DATES.length],
+    board: b, audience: b === 'prayer' ? ['all', 'approved', 'staff', 'all', 'approved', 'staff', 'all'][i] : 'all',
+    anon: b === 'prayer' ? i % 2 === 0 : !!B.anon,
+    pinned: i < (B.pinned || 0), author: b === 'prayer' ? (i % 2 === 0 ? '익명' : '예시 교우') : B.anon ? '익명' : (b === 'notice' || b === 'bulletin' ? '교회 사무실' : '관리자'),
     views: 120 - i * 9 + (i % 3) * 4, hasFile: B.file && i % 2 === 0, hasPhoto: (B.photo || B.bulletin) && true
   }));
 }

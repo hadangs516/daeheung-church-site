@@ -47,6 +47,7 @@
     try {
       const r = await Store.login(u, p);
       if (!r.ok) { busy(form, false); return setErr(form, 'form', r.error); }
+      if (UI.enforceBan()) return;
       toastLater(r.user.name + '님, 환영합니다'); location.href = safeNext(Q.get('next'));
     } catch (e) { busy(form, false); setErr(form, 'form', e.message); }
   };
@@ -213,8 +214,9 @@
      화면 이동은 주소의 # 로: #info(내 정보) #activity(내 활동) #admin(관리: 관리자·대표만, #approve 호환)
      #settings 및 #settings/<항목> */
   const settingsTitles = { profile: '내 정보 수정', password: '비밀번호 변경', privacy: '공개 범위', notif: '알림', view: '화면', leave: '탈퇴하기' };
-  const adminTitles = { signup: '가입 승인', profile: '정보 변경 승인', affil: '소속·교구 승인', reports: '신고 관리', appeals: '이의신청', hidden: '숨긴 글', members: '회원 목록·이용 제재', leaders: '부서 대표·교구장 지정' };
-  let TAB = 'info', SUB = '', ACT = 'all', MEMBER_QUERY = '';
+  const adminTitles = { signup: '가입 승인', profile: '정보 변경 승인', affil: '소속·교구 승인', reports: '신고 관리', appeals: '이의신청', hidden: '숨긴 글', members: '회원 목록·이용 제재', leaders: '부서 대표·교구장 지정', log: '관리 기록' };
+  const logTypes = { '': '전체', approval: '승인', sanction: '제재', post: '게시물', report: '신고·이의', other: '기타' };
+  let TAB = 'info', SUB = '', ACT = 'all', MEMBER_QUERY = '', LOG_QUERY = '', LOG_TYPE = '';
   function route() {
     if (['#account', '#edit'].includes(location.hash)) history.replaceState(null, '', '#settings/profile');
     if (location.hash === '#approve') history.replaceState(null, '', '#admin');
@@ -351,7 +353,7 @@
         <p class="fld-h" style="margin-top:14px">“전체 공개”는 로그인하지 않은 분도 볼 수 있습니다. <a class="mp-prof" href="profile.html?u=${u.id}">내 프로필 미리 보기<span class="ms">chevron_right</span></a></p>`;
     } else if (SUB === 'notif') {
       const pf = Store.notifPrefs ? Store.notifPrefs() : {}, hist = Store.myNotifs ? Store.myNotifs() : [];
-      h = `<p class="note-box"><span class="ms">info</span>알림은 휴대폰으로 울리지 않습니다. 홈페이지에 들어오면 위쪽 종(알림함)에 쌓여서 보입니다.</p><p class="set-lead">받고 싶은 알림만 켜 두세요. 종류별로 끄고 켤 수 있습니다.</p><ul class="set-list sw-list">${(Store.NOTIF_TYPES || []).map(t => `<li><div><b>${t.label}</b><p>${t.desc}</p></div>
+      h = `<p class="note-box"><span class="ms">info</span>알림은 휴대폰으로 울리지 않습니다. 홈페이지에 들어오면 위쪽 종(알림함)에 쌓여서 보입니다.</p><p class="set-lead">받고 싶은 알림만 켜 두세요. 종류별로 끄고 켤 수 있습니다.</p><ul class="set-list sw-list">${(Store.NOTIF_TYPES || []).filter(t => !t.adminOnly || Store.isAdmin()).map(t => `<li><div><b>${t.label}</b><p>${t.desc}</p></div>
           <label class="switch"><input type="checkbox" role="switch" data-action="notif-pref" data-type="${t.id}"${pf[t.id] !== false ? ' checked' : ''} aria-label="${t.label} 알림"><span class="sw"></span></label></li>`).join('')}</ul>
         <h4 class="set-h">알림 기록 <span class="muted">(알림함에서 지워져도 여기에 남습니다)</span></h4>
         ${hist.length ? `<ul class="nh-list">${hist.slice(0, 80).map(n => `<li class="${n.read ? '' : 'unread'}"><a href="${esc(n.link || '#')}" data-action="nh-go" data-id="${n.id}"><span class="nh-t">${esc(n.text)}</span><span class="nh-d">${dotTime(n.at)}${n.read ? '' : ' · 안 읽음'}</span></a></li>`).join('')}</ul>` : '<p class="empty" style="padding:36px 0">아직 받은 알림이 없습니다.</p>'}`;
@@ -386,11 +388,15 @@
       const row = (key, icon) => allowed(key) ? `<a class="set-row admin-row" href="#admin/${key}"><span class="ms" aria-hidden="true">${icon}</span><span>${adminTitles[key]}</span>${count[key] ? `<b class="admin-count" aria-label="대기 ${count[key]}건">${count[key]}</b>` : ''}<span class="ms" aria-hidden="true">chevron_right</span></a>` : '';
       const section = (title, body) => body ? `<section class="set-group"><h4>${title}</h4>${body}</section>` : '';
       return back + '<h3 class="mp-h">관리</h3>' + section('승인', row('signup', 'person_add') + row('profile', 'manage_accounts') + row('affil', 'groups')) +
-        section('게시물', row('reports', 'flag') + row('appeals', 'gavel') + row('hidden', 'visibility_off')) + section('회원', row('members', 'people') + row('leaders', 'supervisor_account'));
+        section('게시물', row('reports', 'flag') + row('appeals', 'gavel') + row('hidden', 'visibility_off')) + section('회원', row('members', 'people') + row('leaders', 'supervisor_account')) + section('기록', row('log', 'history'));
     }
     let h = '';
     if (['signup', 'profile', 'affil', 'reports', 'leaders'].includes(SUB)) h = panelApprove();
-    else if (SUB === 'appeals') {
+    else if (SUB === 'log') {
+      const q = LOG_QUERY.toLocaleLowerCase(), list = Store.adminLogs().filter(l => (!LOG_TYPE || l.type === LOG_TYPE) && (l.target + ' ' + l.detail).toLocaleLowerCase().includes(q));
+      h = `<form class="log-tools" data-action="log-filter" role="search"><label>종류<select name="type">${Object.entries(logTypes).map(([k, v]) => `<option value="${k}"${k === LOG_TYPE ? ' selected' : ''}>${v}</option>`).join('')}</select></label><label>대상·내용<input name="q" type="search" value="${esc(LOG_QUERY)}" placeholder="대상·내용 검색"></label><button type="submit" class="btn sm line">검색</button></form><p class="fld-h">최근 500개까지 보관합니다. ${list.length}건</p>` +
+        (list.length ? `<ul class="my-list admin-log">${list.map(l => `<li><div><span class="chip">${logTypes[l.type] || '기타'}</span> <b>${esc(l.target)}</b><p class="act-t">${esc(l.detail)}</p><span class="my-d">${esc(l.byName)} · ${dotTime(l.at)}</span></div></li>`).join('')}</ul>` : '<p class="ap-none">검색 결과가 없습니다.</p>');
+    } else if (SUB === 'appeals') {
       const list = Store.appeals(), status = { pending: '검토 중', accepted: '수락', rejected: '거절' };
       h = list.length ? `<ul class="my-list">${list.map(a => `<li><div><a class="plain" href="${Store.commentHref(a.board, a.postId)}"><b>${esc(a.title)}</b></a> <span class="chip${a.status === 'pending' ? ' wait' : ''}">${status[a.status]}</span><p class="act-t">${esc(a.text).replace(/\n/g, '<br>')}</p><span class="my-d">${esc(a.byName)} · ${dotTime(a.at)}</span>${a.reply ? `<p class="act-t">답변: ${esc(a.reply)}</p>` : ''}</div>${a.status === 'pending' ? `<div class="my-act"><button type="button" class="btn sm" data-action="appeal-resolve" data-id="${a.id}" data-accept="1">수락</button><button type="button" class="btn sm line" data-action="appeal-resolve" data-id="${a.id}" data-accept="0">거절</button></div>` : ''}</li>`).join('')}</ul>` : '<p class="ap-none">접수된 이의신청이 없습니다.</p>';
     } else if (SUB === 'hidden') {
@@ -405,6 +411,7 @@
     return `${backAdmin}<h3 class="mp-h">${adminTitles[SUB]}</h3><div class="set-body">${h}</div>`;
   }
   Actions['member-search'] = form => { MEMBER_QUERY = form.elements.q.value.trim(); drawMy(); };
+  Actions['log-filter'] = form => { LOG_TYPE = form.elements.type.value; LOG_QUERY = form.elements.q.value.trim(); drawMy(); };
   Actions['admin-unhide'] = el => { if (!Store.setPostHidden(el.dataset.id, false)) return toast('숨김을 해제하지 못했습니다', 'error'); drawMy(); toast('숨김을 해제했습니다'); };
   Actions['appeal-resolve'] = async el => {
     if (!Store.isAdmin()) return;
@@ -571,12 +578,13 @@
     if (!B || rule === 'none') return stop('block', '이 게시판에는 글쓰기가 없습니다.');
     if (rule === 'admin' && !Store.isAdmin()) return stop('lock', '이 게시판은 교회에서만 글을 올릴 수 있습니다.', '<p class="fld-h" style="text-align:center">시험 중에는 마이페이지에서 “시험용 관리자 모드”를 켜면 쓸 수 있습니다.</p><div class="btn-row center" style="margin-top:12px"><a class="btn" href="mypage.html">마이페이지로</a></div>');
     let post = null;
-    if (editId) { post = Store.getPost(editId); if (!post || !Store.isMine(post.owner)) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
+    if (editId) { post = Store.getPost(editId); if (!post || post.board !== board || !Store.isMine(post.owner)) return stop('search_off', '수정할 수 있는 글이 아닙니다.'); }
     const who = m ? esc(m.name) : '게스트';
     C.innerHTML = `<form class="wr" data-action="post-save" data-board="${board}" data-edit="${post ? post.id : ''}" novalidate>
       <p class="wr-as"><span class="ms">edit_note</span>${B.title} · 작성자 <b>${who}</b>${m ? '' : ' <i class="opt">(로그인하지 않아 게스트로 표시됩니다)</i>'}</p>
       <input class="wr-title" name="title" maxlength="100" placeholder="제목을 입력하세요" value="${post ? esc(post.title) : ''}" aria-label="제목">
       ${B.anon ? `<div class="wr-anon" role="radiogroup" aria-label="작성자 표시"><span>작성자 표시</span><label><input type="radio" name="nm" value="real"${post && post.anon ? '' : ' checked'}> 이름 공개 (${who})</label><label><input type="radio" name="nm" value="anon"${post && post.anon ? ' checked' : ''}> 익명</label></div>` : ''}
+      ${board === 'prayer' ? `<fieldset class="wr-audience"><legend>공개 범위 (필수)</legend>${[['all', '모든 사람에게'], ['approved', '승인된 회원에게만'], ['staff', '교역자에게만']].map(([value, label]) => `<label><input type="radio" name="audience" value="${value}" required${(post?.audience || 'all') === value ? ' checked' : ''}${!m && value !== 'all' ? ' disabled' : ''}> ${label}</label>`).join('')}${!m ? '<p class="fld-h">로그인하면 선택할 수 있어요</p>' : ''}<p class="fld-h">댓글도 글과 같은 범위로 공개됩니다. 작성자와 관리자는 항상 볼 수 있습니다.</p></fieldset>` : ''}
       <div class="ed-wrap">
         <div class="ed-tb" role="toolbar" aria-label="글 꾸미기">
           <span class="tb-g"><button type="button" class="tb-img" data-action="img-pick" aria-label="사진 넣기" title="사진 넣기"><span class="ms">add_photo_alternate</span><span class="lbl">사진</span></button><input type="file" accept="image/*" multiple hidden data-action="img-file"></span>
@@ -655,7 +663,9 @@
     if (!title) return setErr(form, 'title', '제목을 입력해 주세요.');
     if (!ed.textContent.trim() && !ed.querySelector('img')) { form.querySelector('[data-err="form"]').textContent = '내용을 입력해 주세요.'; ed.focus(); return; }
     const anon = !!form.querySelector('[name="nm"][value="anon"]:checked');
-    const p = Store.savePost({ id: form.dataset.edit || null, board: form.dataset.board, title, html: ed.innerHTML, anon });
+    const audience = form.querySelector('[name="audience"]:checked')?.value;
+    if (form.dataset.board === 'prayer' && !audience) return setErr(form, 'form', '공개 범위를 선택해 주세요.');
+    const p = Store.savePost({ id: form.dataset.edit || null, board: form.dataset.board, title, html: ed.innerHTML, anon, audience });
     if (!p) { if (Store.writeError()) return setErr(form, 'form', Store.writeError()); Modal.alert(QUOTA_MSG, { title: '저장 공간 부족' }); usage(); return; }
     toastLater(form.dataset.edit ? '글을 수정했습니다' : '글을 저장했습니다'); location.href = 'board-view.html?b=' + form.dataset.board + '&id=' + p.id;
   };

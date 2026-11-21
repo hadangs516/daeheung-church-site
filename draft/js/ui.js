@@ -56,6 +56,29 @@
 
   /* ===== v3-B: UI 도구 — 점 세 개 메뉴 · 작성자 사진 · 상대 시간 · 신고 ===== */
   const UI = window.UI = window.UI || {};
+  // 모든 페이지에서 같은 차단 화면 사용. 기본 dialog가 배경과 포커스를 격리한다.
+  UI.enforceBan = () => {
+    const ban = Store.activeBan(); if (!ban) return false;
+    if (document.querySelector('.ban-screen')) return true;
+    const dialog = document.createElement('dialog'); dialog.className = 'ban-screen';
+    dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-labelledby', 'ban-title');
+    dialog.setAttribute('aria-describedby', 'ban-description');
+    const time = ban.until === null ? '영구' : (() => {
+      const d = new Date(ban.until), pad = n => String(n).padStart(2, '0');
+      return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + '까지';
+    })();
+    dialog.innerHTML = `<div class="ban-card"><span class="ms ban-icon" aria-hidden="true">block</span><h1 id="ban-title">이용이 제한된 계정입니다</h1><div id="ban-description"><p>기간: ${escH(time)}</p><p class="ban-reason">사유: ${escH(ban.reason)}</p><p>계속 이용하려면 로그아웃해 주세요.</p></div><button type="button" class="btn" autofocus>로그아웃</button></div>`;
+    const button = dialog.querySelector('button');
+    button.addEventListener('click', () => { Store.logout(); location.replace('home.html'); });
+    dialog.addEventListener('cancel', e => e.preventDefault());
+    dialog.addEventListener('keydown', e => {
+      if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); button.focus(); }
+    });
+    document.documentElement.classList.add('account-blocked');
+    document.body.append(dialog); dialog.showModal(); button.focus();
+    return true;
+  };
+  UI.audienceBadge = p => p.board === 'prayer' && p.audience !== 'all' && !p.locked ? `<em class="audience-badge">${p.audience === 'staff' ? '교역자 공개' : '회원 공개'}</em>` : '';
   UI.hiddenBadge = post => post.hidden ? '<em class="post-hidden">숨김</em>' + (post.id && Store.isMine(post.owner) && Store.pendingAppeal(post.id) ? '<em class="post-hidden">이의신청 검토 중</em>' : '') : '';
   // 새 관리·이의신청 폼: 기본 dialog가 포커스 이동·복귀, Escape, 배경 비활성화를 맡는다.
   UI.formDialog = ({ title, body, submit, validate }) => new Promise(resolve => {
@@ -239,4 +262,6 @@
     });
     document.addEventListener('keydown', key); draw(); document.body.append(lb);
   });
+  UI.enforceBan();
+  addEventListener('storage', () => UI.enforceBan());
 })();
