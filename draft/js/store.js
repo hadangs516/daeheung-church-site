@@ -21,7 +21,7 @@
     list.push({ at: Date.now(), by: m.id, byName: m.name, type, target: String(target || ''), detail: String(detail || '') });
     write(K.adminlog, list.slice(-500));
   }
-  const adminLogs = () => isAdmin() ? read(K.adminlog, []).slice().reverse() : [];
+  const adminLogs = () => isAdmin() ? read(K.adminlog, []).toReversed() : [];
 
   /* ---------- 해시 ---------- */
   const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');

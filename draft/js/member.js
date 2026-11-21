@@ -614,7 +614,7 @@
       if (ed.contains(r.commonAncestorContainer)) { SAVED = r.cloneRange(); syncTb(); }
     });
     $('.ed-tb').addEventListener('mousedown', e => { if (!e.target.closest('input')) e.preventDefault(); });   // 눌러도 글 선택이 풀리지 않게
-    ed.addEventListener('input', () => { if (!ed.textContent.trim() && !ed.querySelector('img')) ed.innerHTML = ''; });
+    ed.addEventListener('input', () => { if (!ed.textContent.trim() && !ed.querySelector('img')) ed.replaceChildren(); });
     ed.addEventListener('paste', e => {
       e.preventDefault();
       const files = [...(e.clipboardData.files || [])].filter(f => /^image\//.test(f.type));

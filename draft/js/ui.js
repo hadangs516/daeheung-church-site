@@ -81,12 +81,15 @@
   UI.audienceBadge = p => p.board === 'prayer' && p.audience !== 'all' && !p.locked ? `<em class="audience-badge">${p.audience === 'staff' ? '교역자 공개' : '회원 공개'}</em>` : '';
   UI.hiddenBadge = post => post.hidden ? '<em class="post-hidden">숨김</em>' + (post.id && Store.isMine(post.owner) && Store.pendingAppeal(post.id) ? '<em class="post-hidden">이의신청 검토 중</em>' : '') : '';
   // 새 관리·이의신청 폼: 기본 dialog가 포커스 이동·복귀, Escape, 배경 비활성화를 맡는다.
+  let formDialogSeq = 0;
   UI.formDialog = ({ title, body, submit, validate }) => new Promise(resolve => {
     const dialog = document.createElement('dialog'); dialog.className = 'form-dialog';
+    dialog.id = 'form-dialog-' + (++formDialogSeq);
     dialog.setAttribute('aria-label', title);
-    dialog.innerHTML = `<form class="mb-form"><h3 class="modal-t">${escH(title)}</h3><div class="modal-body">${body}</div><p class="field-err" role="alert" data-dialog-error></p><div class="modal-act"><button type="button" class="btn line" data-dialog-cancel>취소</button><button type="submit" class="btn">${escH(submit)}</button></div></form>`;
+    dialog.innerHTML = `<form class="mb-form"><h3 class="modal-t">${escH(title)}</h3><div class="modal-body">${body}</div><p class="field-err" role="alert" data-dialog-error></p><div class="modal-act"><button type="button" class="btn line" command="close" commandfor="${dialog.id}" data-dialog-cancel>취소</button><button type="submit" class="btn">${escH(submit)}</button></div></form>`;
     let result = null;
-    dialog.querySelector('[data-dialog-cancel]').addEventListener('click', () => dialog.close());
+    // 취소는 command="close"(Invoker Commands)가 맡는다. 지원하지 않는 옛 브라우저에서만 예전 방식으로 닫는다.
+    if (!('commandForElement' in HTMLButtonElement.prototype)) dialog.querySelector('[data-dialog-cancel]').addEventListener('click', () => dialog.close());
     dialog.querySelector('form').addEventListener('submit', e => {
       e.preventDefault();
       const values = Object.fromEntries(new FormData(e.currentTarget));
