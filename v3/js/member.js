@@ -210,15 +210,17 @@
   Actions.logout = () => { Store.logout(); toastLater('로그아웃했습니다'); location.href = 'home.html'; };
 
   /* ================= 마이페이지 =================
-     화면 이동은 주소의 # 로: #info(내 정보) #activity(내 활동) #approve(승인 관리: 관리자·대표만)
+     화면 이동은 주소의 # 로: #info(내 정보) #activity(내 활동) #admin(관리: 관리자·대표만, #approve 호환)
      #settings 및 #settings/<항목> */
   const settingsTitles = { profile: '내 정보 수정', password: '비밀번호 변경', privacy: '공개 범위', notif: '알림', view: '화면', leave: '탈퇴하기' };
-  let TAB = 'info', SUB = '', ACT = 'all';
+  const adminTitles = { signup: '가입 승인', profile: '정보 변경 승인', affil: '소속·교구 승인', reports: '신고 관리', appeals: '이의신청', hidden: '숨긴 글', members: '회원 목록·이용 제재', leaders: '부서 대표·교구장 지정' };
+  let TAB = 'info', SUB = '', ACT = 'all', MEMBER_QUERY = '';
   function route() {
     if (['#account', '#edit'].includes(location.hash)) history.replaceState(null, '', '#settings/profile');
+    if (location.hash === '#approve') history.replaceState(null, '', '#admin');
     const [tab, sub] = location.hash.slice(1).split('/');
-    TAB = ['info', 'activity', 'approve', 'settings'].includes(tab) ? tab : 'info';
-    SUB = TAB === 'settings' && Object.keys(settingsTitles).includes(sub) ? sub : '';
+    TAB = ['info', 'activity', 'admin', 'settings'].includes(tab) ? tab : 'info';
+    SUB = Object.keys(TAB === 'admin' ? adminTitles : TAB === 'settings' ? settingsTitles : {}).includes(sub) ? sub : '';
   }
   function mypage(C) {
     if (!Store.me()) { location.replace('login.html?next=mypage.html'); return; }
@@ -234,14 +236,14 @@
   const dotTime = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return dotDate(t) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
   const fmtBirth = b => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(b || ''); return m ? `${+m[1]}년 ${+m[2]}월 ${+m[3]}일` : '(없음)'; };
   const groupChips = u => (u.groups || []).length ? (u.groups || []).map(g => `<span class="chip${g.status === 'pending' ? ' wait' : g.status === 'rejected' ? ' no' : ''}">${esc(Store.groupText(g))}${g.status === 'pending' ? ' · 승인 대기' : g.status === 'rejected' ? ' · 승인 안 됨' : ''}</span>`).join('') : '<span class="muted">(없음 · 무소속)</span>';
-  const parishText = u => u.parish ? `<span class="chip${u.parish.status === 'pending' ? ' wait' : u.parish.status === 'rejected' ? ' no' : ''}">${esc(Store.parishName(u.parish.id))}${u.parish.status === 'pending' ? ' · 승인 대기' : u.parish.status === 'rejected' ? ' · 승인 안 됨' : ''}</span>` : '<span class="muted">(없음)</span>';
-  const approveCount = () => (Store.isAdmin() ? Store.signupList().length + Store.pendingList().length : 0) + Store.affilQueue().length;
+  const parishText = (u, showApproved = false) => u.parish ? `<span class="chip${u.parish.status === 'pending' ? ' wait' : u.parish.status === 'rejected' ? ' no' : ''}">${esc(Store.parishName(u.parish.id))}${u.parish.status === 'pending' ? ' · 승인 대기' : u.parish.status === 'rejected' ? ' · 승인 안 됨' : showApproved ? ' · 승인됨' : ''}</span>` : '<span class="muted">(없음)</span>';
+  const approveCount = () => (Store.isAdmin() ? Store.signupList().length + Store.pendingList().length + Store.reports().filter(r => !r.done).length + Store.appeals().filter(a => a.status === 'pending').length : 0) + Store.affilQueue().length;
 
   function drawMy(C) {
     C = C || $('#content'); const u = Store.me(); if (!u) return;
     const admin = Store.isAdmin(), cnt = (admin || Store.isLeader()) ? approveCount() : 0;
-    const tabs = [['info', '내 정보'], ['activity', '내 활동']].concat(admin || Store.isLeader() ? [['approve', '승인 관리' + (cnt ? ' (' + cnt + ')' : '')]] : []);
-    if (TAB === 'approve' && tabs.length < 3) TAB = 'info';
+    const tabs = [['info', '내 정보'], ['activity', '내 활동']].concat(admin || Store.isLeader() ? [['admin', '관리' + (cnt ? ' (' + cnt + ')' : '')]] : []);
+    if (TAB === 'admin' && tabs.length < 3) TAB = 'info';
     const aff = Store.groupText && (u.groups || []).filter(g => g.status === 'approved').map(g => Store.groupText(g));
     C.innerHTML = `<div class="mp">
       <aside class="mp-side"><div class="mp-me">${avatar(u)}<div class="mp-me-t"><b>${esc(u.name)}</b><span>${esc(u.rank)}${aff.length ? ' · ' + esc(aff.join(' · ')) : ''}</span>${badgeHtml(u)}</div></div></aside>
@@ -257,13 +259,13 @@
 
   function panel(u) {
     if (TAB === 'activity') return panelActivity();
-    if (TAB === 'approve') return panelApprove();
+    if (TAB === 'admin') return panelAdmin();
     if (TAB === 'settings') return panelSettings(u);
     /* 내 정보 (보기 화면) */
     const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
     const notice = (Store.statusOf(u) === 'pending' ? `<div class="pend-box"><div><b><span class="ms">hourglass_top</span>가입 승인 대기 중</b><p>관리자가 확인하면 승인됩니다. 그 전에도 홈페이지는 그대로 이용하실 수 있습니다.</p></div></div>`
       : Store.statusOf(u) === 'rejected' ? `<div class="pend-box"><div><b><span class="ms">info</span>가입 승인이 아직 되지 않았어요</b><p>교회 사무실에 문의해 주세요.</p></div></div>` : '') + pendBox(u);
-    return `${notice}<div class="mp-view"><div class="mp-photo">${avatar(u)}<div class="mp-v-id"><b class="mp-v-name">${esc(u.name)}</b><span class="mp-v-rank">${esc(u.rank)}</span>
+    return `${Store.writeError() ? `<p class="note-box ban-notice" role="alert">${esc(Store.writeError())}</p>` : ''}${notice}<div class="mp-view"><div class="mp-photo">${avatar(u)}<div class="mp-v-id"><b class="mp-v-name">${esc(u.name)}</b><span class="mp-v-rank">${esc(u.rank)}</span>
         <a class="mp-prof" href="profile.html?u=${u.id}">내 프로필 보기<span class="ms">chevron_right</span></a></div>
         <div class="mp-v-btns"><button type="button" class="mp-gear" data-action="mp-tab" data-tab="settings" aria-label="설정"><span class="ms" aria-hidden="true">settings</span></button></div></div>
         <dl class="info mp-dl">${row('이름', esc(u.name))}${row('직분', esc(u.rank))}${row('소속', groupChips(u))}${row('교구', parishText(u))}${row('생년월일', fmtBirth(u.birth))}${row('연락처', esc(u.phone) || '(없음)')}${row('자기소개', u.bio ? esc(u.bio).replace(/\n/g, '<br>') : '<span class="muted">(아직 없습니다)</span>')}</dl>
@@ -286,7 +288,7 @@
     const KL = { post: '글', comment: '댓글', reply: '답글' };
     return `<div class="seg act-seg" role="tablist">${seg.map(s => `<button type="button" role="tab" data-action="act-filter" data-k="${s[0]}"${s[0] === ACT ? ' class="on" aria-selected="true"' : ''}>${s[1]} ${s[2]}</button>`).join('')}</div>` +
       (list.length ? `<ul class="my-list act-list">${list.map(i => `<li><div class="act-main"><span class="act-k k-${i.kind}">${KL[i.kind]}</span><span class="my-b">${esc(i.board === 'album' ? '포토앨범' : (BOARDS[i.board] || {}).title || i.board)}</span>
-        <a href="${i.href}">${esc(i.title)}${UI.hiddenBadge(i)}</a>${i.text ? `<p class="act-t">${esc(i.text).replace(/\n/g, '<br>')}</p>` : ''}<span class="my-d">${dotDate(i.at)}${i.p && i.p.anon ? ' · 익명' : ''}</span></div>
+        <a href="${i.href}">${esc(i.title)}${UI.hiddenBadge(i.p || i)}</a>${i.text ? `<p class="act-t">${esc(i.text).replace(/\n/g, '<br>')}</p>` : ''}<span class="my-d">${dotDate(i.at)}${i.p && i.p.anon ? ' · 익명' : ''}</span></div>
         ${i.p ? `<div class="my-act"><a class="btn sm line" href="write.html?b=${i.board}&edit=${i.p.id}">수정</a><button type="button" class="btn sm line" data-action="post-del" data-id="${i.p.id}" data-board="${i.board}" data-back="mypage.html#activity">삭제</button></div>` : ''}</li>`).join('')}</ul>`
         : `<p class="empty">${ACT === 'all' ? '아직 쓴 글이나 댓글이 없습니다.' : '아직 없습니다.'}<br><a class="btn sm" style="margin-top:16px" href="write.html?b=freeboard">자유게시판에 글쓰기</a></p>`);
   }
@@ -309,7 +311,7 @@
         <div>${field('생년월일 ' + need, birthHtml(val('birth')), 'birth', null, true)}${wait('birth')}</div>
         <div>${field('연락처 ' + need, `<input name="phone" type="tel" inputmode="tel" value="${esc(val('phone'))}" placeholder="010-0000-0000" data-oninput="phone-fmt">`, 'phone')}${wait('phone')}</div></div>
         ${affBlock((u.groups || []).map(g => ({ id: g.id, role: g.role })), u.groups)}
-        ${field('교구 <i class="opt">(선택)</i>', `<select name="parish">${parishOpts(u.parish && u.parish.id)}</select>`, 'parish', '바꾸면 교구장님의 승인이 다시 필요합니다.')}
+        ${field('교구 <i class="opt">(선택)</i> ' + parishText(u, true), `<select name="parish" data-action="parish-state" data-current="${esc(u.parish?.id || '')}">${parishOpts(u.parish && u.parish.id)}</select><span class="fld-h" data-parish-state aria-live="polite"></span>`, 'parish', '바꾸면 교구장님의 승인이 다시 필요합니다.')}
         <p class="field-err" data-err="form" role="alert"></p>
         <div class="btn-row end"><button type="button" class="btn line" data-action="mp-tab" data-tab="settings">취소</button><button class="btn" type="submit">저장</button></div></form>`;
   }
@@ -349,7 +351,7 @@
         <p class="fld-h" style="margin-top:14px">“전체 공개”는 로그인하지 않은 분도 볼 수 있습니다. <a class="mp-prof" href="profile.html?u=${u.id}">내 프로필 미리 보기<span class="ms">chevron_right</span></a></p>`;
     } else if (SUB === 'notif') {
       const pf = Store.notifPrefs ? Store.notifPrefs() : {}, hist = Store.myNotifs ? Store.myNotifs() : [];
-      h = `<p class="set-lead">받고 싶은 알림만 켜 두세요. 종류별로 끄고 켤 수 있습니다.</p><ul class="set-list sw-list">${(Store.NOTIF_TYPES || []).map(t => `<li><div><b>${t.label}</b><p>${t.desc}</p></div>
+      h = `<p class="note-box"><span class="ms">info</span>알림은 휴대폰으로 울리지 않습니다. 홈페이지에 들어오면 위쪽 종(알림함)에 쌓여서 보입니다.</p><p class="set-lead">받고 싶은 알림만 켜 두세요. 종류별로 끄고 켤 수 있습니다.</p><ul class="set-list sw-list">${(Store.NOTIF_TYPES || []).map(t => `<li><div><b>${t.label}</b><p>${t.desc}</p></div>
           <label class="switch"><input type="checkbox" role="switch" data-action="notif-pref" data-type="${t.id}"${pf[t.id] !== false ? ' checked' : ''} aria-label="${t.label} 알림"><span class="sw"></span></label></li>`).join('')}</ul>
         <h4 class="set-h">알림 기록 <span class="muted">(알림함에서 지워져도 여기에 남습니다)</span></h4>
         ${hist.length ? `<ul class="nh-list">${hist.slice(0, 80).map(n => `<li class="${n.read ? '' : 'unread'}"><a href="${esc(n.link || '#')}" data-action="nh-go" data-id="${n.id}"><span class="nh-t">${esc(n.text)}</span><span class="nh-d">${dotTime(n.at)}${n.read ? '' : ' · 안 읽음'}</span></a></li>`).join('')}</ul>` : '<p class="empty" style="padding:36px 0">아직 받은 알림이 없습니다.</p>'}`;
@@ -358,13 +360,15 @@
         <div class="acct"><div class="acct-row"><div><b>시험 데이터 전체 초기화</b><p>이 브라우저에 저장된 모든 시험 계정·글·댓글을 지웁니다.</p></div><button type="button" class="btn line" data-action="reset-all">전체 초기화</button></div>
         <p class="fld-h">저장 공간 사용: 약 ${Store.usageKB().toLocaleString()}KB / 5,000KB (브라우저마다 다릅니다)</p></div>`;
     } else {
-      h = `<div class="leave"><p class="set-lead">탈퇴하면 로그인 정보와 내 정보가 삭제되고 되돌릴 수 없습니다.</p>
+      h = `<form class="leave mb-form wide" data-action="withdraw" novalidate><p class="set-lead">탈퇴하면 로그인 정보와 내 정보가 삭제되고 되돌릴 수 없습니다.</p>
+        ${field('비밀번호', pwf('password', 'current-password'), 'password', '본인 확인을 위해 현재 비밀번호를 입력해 주세요.')}
         <label class="chk"><input type="checkbox" id="leave-del"><span><b>내 글·댓글도 모두 지우기</b><i>체크하지 않으면 쓴 글과 댓글은 그대로 남습니다. (작성자 이름만 남아요)</i></span></label>
-        <button type="button" class="btn danger" data-action="withdraw">탈퇴하기</button></div>`;
+        <p class="field-err" data-err="form" role="alert"></p><button type="submit" class="btn danger">탈퇴하기</button></form>`;
     }
     return `<a class="mp-back" href="#settings"><span class="ms" aria-hidden="true">arrow_back</span>설정</a><h3 class="mp-h">${settingsTitles[SUB]}</h3><div class="set-body">${h}</div>`;
   }
   Actions['set-sub'] = el => { location.hash = 'settings/' + el.dataset.k; };
+  Actions['parish-state'] = el => { el.parentElement.querySelector('[data-parish-state]').textContent = el.value !== el.dataset.current && el.value ? '저장하면 승인 대기로 신청됩니다.' : ''; };
   Actions['priv-set'] = el => { Store.setPrivacy(el.dataset.key, el.value); toast('공개 범위를 바꿨습니다'); };
   Actions['notif-pref'] = el => { Store.setNotifPref(el.dataset.type, el.checked); toast(el.checked ? '이 알림을 켰습니다' : '이 알림을 껐습니다'); };
   Actions['nh-go'] = el => { if (Store.readNotif) Store.readNotif(el.dataset.id); };
@@ -372,10 +376,62 @@
   Actions['big-text'] = el => { Store.setPref('bigText', el.checked); applyPrefs(); toast(el.checked ? '글자를 크게 보여 드립니다' : '글자 크기를 원래대로 했습니다'); };
   applyPrefs();
 
-  /* ---------- 승인 관리 (관리자 모드 · 부서 대표·교구장) ---------- */
+  /* ---------- 관리 목록과 항목별 화면 ---------- */
+  function panelAdmin() {
+    const admin = Store.isAdmin(), allowed = key => admin || key === 'affil';
+    const backAdmin = '<a class="mp-back" href="#admin"><span class="ms" aria-hidden="true">arrow_back</span>관리</a>';
+    const count = { signup: admin ? Store.signupList().length : 0, profile: admin ? Store.pendingList().length : 0, affil: Store.affilQueue().length,
+      reports: admin ? Store.reports().filter(r => !r.done).length : 0, appeals: admin ? Store.appeals().filter(a => a.status === 'pending').length : 0 };
+    if (!SUB || !allowed(SUB)) {
+      const row = (key, icon) => allowed(key) ? `<a class="set-row admin-row" href="#admin/${key}"><span class="ms" aria-hidden="true">${icon}</span><span>${adminTitles[key]}</span>${count[key] ? `<b class="admin-count" aria-label="대기 ${count[key]}건">${count[key]}</b>` : ''}<span class="ms" aria-hidden="true">chevron_right</span></a>` : '';
+      const section = (title, body) => body ? `<section class="set-group"><h4>${title}</h4>${body}</section>` : '';
+      return back + '<h3 class="mp-h">관리</h3>' + section('승인', row('signup', 'person_add') + row('profile', 'manage_accounts') + row('affil', 'groups')) +
+        section('게시물', row('reports', 'flag') + row('appeals', 'gavel') + row('hidden', 'visibility_off')) + section('회원', row('members', 'people') + row('leaders', 'supervisor_account'));
+    }
+    let h = '';
+    if (['signup', 'profile', 'affil', 'reports', 'leaders'].includes(SUB)) h = panelApprove();
+    else if (SUB === 'appeals') {
+      const list = Store.appeals(), status = { pending: '검토 중', accepted: '수락', rejected: '거절' };
+      h = list.length ? `<ul class="my-list">${list.map(a => `<li><div><a class="plain" href="${Store.commentHref(a.board, a.postId)}"><b>${esc(a.title)}</b></a> <span class="chip${a.status === 'pending' ? ' wait' : ''}">${status[a.status]}</span><p class="act-t">${esc(a.text).replace(/\n/g, '<br>')}</p><span class="my-d">${esc(a.byName)} · ${dotTime(a.at)}</span>${a.reply ? `<p class="act-t">답변: ${esc(a.reply)}</p>` : ''}</div>${a.status === 'pending' ? `<div class="my-act"><button type="button" class="btn sm" data-action="appeal-resolve" data-id="${a.id}" data-accept="1">수락</button><button type="button" class="btn sm line" data-action="appeal-resolve" data-id="${a.id}" data-accept="0">거절</button></div>` : ''}</li>`).join('')}</ul>` : '<p class="ap-none">접수된 이의신청이 없습니다.</p>';
+    } else if (SUB === 'hidden') {
+      const list = Store.hiddenPosts();
+      h = list.length ? `<ul class="my-list">${list.map(p => `<li><div><a class="plain" href="${Store.commentHref(p.board, p.id)}">${esc(p.title)}</a><span class="my-d">${p.hiddenBy === 'admin' ? '관리자 숨김' : '작성자 숨김'} · ${dotTime(p.hiddenAt || p.at)}</span></div><button type="button" class="btn sm line" data-action="admin-unhide" data-id="${p.id}">숨김 해제</button></li>`).join('')}</ul>` : '<p class="ap-none">숨긴 글이 없습니다.</p>';
+    } else if (SUB === 'members') {
+      const q = MEMBER_QUERY.toLocaleLowerCase(), list = Store.allMembers().filter(m => [m.name, m.username, m.rank].some(t => String(t || '').toLocaleLowerCase().includes(q)));
+      const status = { approved: '승인됨', pending: '가입 승인 대기', rejected: '가입 승인 안 됨' };
+      h = `<form class="bd-search admin-search" data-action="member-search" role="search"><input name="q" type="search" value="${esc(MEMBER_QUERY)}" placeholder="이름·아이디·직분 검색" aria-label="회원 검색"><button type="submit" aria-label="검색"><span class="ms">search</span></button></form>` +
+        (list.length ? `<ul class="my-list">${list.map(m => `<li><div><a class="plain" href="profile.html?u=${m.id}"><b>${esc(m.name)}</b></a> (${esc(m.username)}) <span class="chip">${status[m.status] || '승인됨'}</span>${Store.activeBan(m) ? '<span class="chip no">제재</span>' : ''}<span class="my-d">${esc(m.rank || '')}</span>${Store.activeBan(m) ? `<p class="act-t danger-t">${esc(Store.writeError(m))}</p>` : ''}</div><button type="button" class="btn sm line" data-action="${Store.activeBan(m) ? 'sanction-lift' : 'sanction-open'}" data-id="${m.id}">${Store.activeBan(m) ? '제재 해제' : '제재하기'}</button></li>`).join('')}</ul>` : '<p class="ap-none">검색 결과가 없습니다.</p>');
+    }
+    return `${backAdmin}<h3 class="mp-h">${adminTitles[SUB]}</h3><div class="set-body">${h}</div>`;
+  }
+  Actions['member-search'] = form => { MEMBER_QUERY = form.elements.q.value.trim(); drawMy(); };
+  Actions['admin-unhide'] = el => { if (!Store.setPostHidden(el.dataset.id, false)) return toast('숨김을 해제하지 못했습니다', 'error'); drawMy(); toast('숨김을 해제했습니다'); };
+  Actions['appeal-resolve'] = async el => {
+    if (!Store.isAdmin()) return;
+    const accepted = el.dataset.accept === '1';
+    const values = await UI.formDialog({ title: '이의신청 ' + (accepted ? '수락' : '거절'), body: '<p>' + (accepted ? '수락하면 해당 글의 숨김이 해제됩니다.' : '거절 사유를 작성자에게 안내할 수 있습니다.') + '</p><label class="fld">답변 (선택)<textarea name="reply" rows="3" maxlength="500" autofocus></textarea></label>', submit: accepted ? '수락' : '거절' });
+    if (!values) return;
+    const r = Store.resolveAppeal(el.dataset.id, accepted, values.reply);
+    if (!r.ok) return toast(r.error, 'error'); drawMy(); toast('이의신청을 처리했습니다');
+  };
+  Actions['sanction-open'] = async el => {
+    if (!Store.isAdmin()) return;
+    const values = await UI.formDialog({ title: '이용 제재', body: '<label class="fld">제재 기간<select name="duration" data-action="sanction-duration"><option value="days">일수 지정</option><option value="permanent">영구</option></select></label><label class="fld">일수 (1~3650일)<input name="days" type="number" min="1" max="3650" step="1" value="7" required autofocus></label><label class="fld">제재 사유<textarea name="reason" rows="3" maxlength="500" required></textarea></label>', submit: '제재하기', validate: v => v.reason.trim() ? '' : '제재 사유를 입력해 주세요.' });
+    if (!values) return;
+    const r = Store.sanctionUser(el.dataset.id, values.duration === 'permanent' ? null : Number(values.days), values.reason);
+    if (!r.ok) return toast(r.error, 'error'); drawMy(); toast('이용 제재를 적용했습니다');
+  };
+  Actions['sanction-duration'] = el => { const input = el.form.elements.days; input.disabled = el.value === 'permanent'; input.required = !input.disabled; };
+  Actions['sanction-lift'] = async el => {
+    if (!Store.isAdmin() || !(await Modal.confirm('이 회원의 이용 제재를 해제할까요?', { title: '이용 제재 해제', ok: '해제' }))) return;
+    const r = Store.liftSanction(el.dataset.id); if (!r.ok) return toast(r.error, 'error'); drawMy(); toast('이용 제재를 해제했습니다');
+  };
+
+  /* ---------- 승인·신고·대표 지정: 기존 기능을 해당 관리 상세에서 표시 ---------- */
   function panelApprove() {
     const admin = Store.isAdmin(), q = Store.affilQueue(), btn = (a, id, extra) => `<div class="my-act"><button type="button" class="btn sm" data-action="${a}-ok" ${extra || ''} data-id="${id}">승인</button><button type="button" class="btn sm line" data-action="${a}-no" ${extra || ''} data-id="${id}">거절</button></div>`;
-    const sec = (t, n, body, hint) => `<section class="ap-sec"><h4 class="set-h">${t} <b>${n}</b></h4>${hint ? `<p class="fld-h" style="margin:-4px 0 8px">${hint}</p>` : ''}${body}</section>`;
+    const sectionKeys = { '가입 승인': 'signup', '정보 변경 승인': 'profile', '소속·교구 승인': 'affil', '부서 대표 · 교구장 지정': 'leaders', '신고 목록': 'reports' };
+    const sec = (t, n, body, hint) => sectionKeys[t] === SUB ? `<section class="ap-sec">${n !== '' ? `<h4 class="set-h">${t} <b>${n}</b></h4>` : ''}${hint ? `<p class="fld-h" style="margin:-4px 0 8px">${hint}</p>` : ''}${body}</section>` : '';
     const none = t => `<p class="ap-none">${t}</p>`;
     let h = '';
     if (admin) {
@@ -387,7 +443,7 @@
     h += sec('소속·교구 승인', q.length, q.length ? `<ul class="my-list">${q.map(x => `<li><div><b>${esc(x.name)}</b>님 · ${x.kind === 'group' ? '소속' : '교구'} <span class="chip">${esc(x.label)}</span></div>${btn('affil', x.uid, `data-kind="${x.kind}" data-gid="${x.id}" data-role="${x.role || ''}"`)}</li>`).join('')}</ul>` : none('승인을 기다리는 신청이 없습니다.'),
       admin ? '관리자 모드에서는 모든 신청이 보입니다. 부서 대표가 정해진 곳은 대표님이 승인합니다.' : '내가 대표(교구장)인 부서·교구의 신청만 보입니다.');
     if (admin) {
-      h += sec('부서 대표 · 교구장 지정', '', leaderEditor(), '대표로 지정된 회원은 마이페이지 “승인 관리”에서 그 부서의 신청을 승인·거절합니다.');
+      h += sec('부서 대표 · 교구장 지정', '', SUB === 'leaders' ? leaderEditor() : '', '대표로 지정된 회원은 마이페이지 “관리”에서 그 부서의 신청을 승인·거절합니다.');
       const R = Store.reports ? Store.reports() : [], KL = { post: '글', comment: '댓글', image: '사진' };
       h += sec('신고 목록', R.filter(r => !r.done).length, R.length ? `<ul class="my-list rp-list">${R.map(r => `<li class="${r.done ? 'done' : ''}"><div><span class="act-k k-rp">${KL[r.kind] || r.kind}</span><b>${esc(r.reason || '사유 없음')}</b>${r.label ? ' · ' + esc(r.label) : ''}${r.text ? `<p class="act-t">${esc(r.text)}</p>` : ''}
           <span class="my-d">${esc(r.byName || '')} · ${dotTime(r.at)}${r.done ? ' · 처리됨' : ''}${r.link ? ` · <a class="plain" href="${esc(r.link)}">신고된 곳 보기</a>` : ''}</span></div>
@@ -453,13 +509,24 @@
     if (form.next.value.length < 4) return setErr(form, 'next', '4자 이상 입력해 주세요.');
     if (form.next.value !== form.next2.value) return setErr(form, 'next2', '새 비밀번호가 서로 다릅니다. 다시 확인해 주세요.');
     busy(form, true);
-    try { const r = await Store.changePassword(form.cur.value, form.next.value); busy(form, false); if (!r.ok) return setErr(form, r.field || 'form', r.error); form.reset(); form.querySelectorAll('.pw-meter').forEach(m => { m.dataset.lv = 0; }); toast('비밀번호를 바꿨습니다'); }
+    try { const r = await Store.changePassword(form.cur.value, form.next.value); busy(form, false); if (!r.ok) return setErr(form, r.field || 'form', r.error); toastLater('비밀번호를 바꿨습니다. 새 비밀번호로 다시 로그인해 주세요'); location.href = 'login.html?next=mypage.html'; }
     catch (e) { busy(form, false); setErr(form, 'form', e.message); }
   };
-  Actions.withdraw = async () => {
-    const del = !!($('#leave-del') || {}).checked;
-    const msg = '탈퇴하면 로그인 정보와 내 정보가 삭제되고 되돌릴 수 없습니다.<br>' + (del ? '<b>내가 쓴 글과 댓글도 모두 삭제됩니다.</b>' : '내가 쓴 글과 댓글은 그대로 남습니다.') + '<br><br>정말 탈퇴할까요?';
-    if (await Modal.confirm(msg, { title: '탈퇴 확인', ok: '탈퇴하기', cancel: '그만두기', danger: true })) { Store.withdraw({ deleteContent: del }); toastLater('탈퇴했습니다. 그동안 함께해 주셔서 감사합니다'); location.href = 'home.html'; }
+  Actions.withdraw = async form => {
+    clearErr(form);
+    const password = form.elements.password.value;
+    if (!password) return setErr(form, 'password', '비밀번호를 입력해 주세요.');
+    busy(form, true);
+    try {
+      if (!(await Store.verifyPassword(password))) return setErr(form, 'password', '비밀번호가 맞지 않습니다');
+      const del = !!($('#leave-del') || {}).checked;
+      const msg = '탈퇴하면 로그인 정보와 내 정보가 삭제되고 되돌릴 수 없습니다.<br>' + (del ? '<b>내가 쓴 글과 댓글도 모두 삭제됩니다.</b>' : '내가 쓴 글과 댓글은 그대로 남습니다.') + '<br><br>정말 탈퇴할까요?';
+      if (await Modal.confirm(msg, { title: '탈퇴 확인', ok: '탈퇴하기', cancel: '그만두기', danger: true })) {
+        const r = await Store.withdraw({ password, deleteContent: del });
+        if (!r.ok) return setErr(form, r.field || 'form', r.error);
+        toastLater('탈퇴했습니다. 그동안 함께해 주셔서 감사합니다'); location.href = 'home.html';
+      }
+    } catch (e) { setErr(form, 'form', e.message); } finally { busy(form, false); }
   };
   Actions['reset-all'] = async () => { if (await Modal.confirm('이 브라우저에 저장된 모든 시험 계정·글·댓글을 지웁니다. 계속할까요?', { title: '전체 초기화', ok: '초기화', danger: true })) { Store.resetAll(); toastLater('시험 데이터를 모두 지웠습니다'); location.href = 'home.html'; } };
   Actions['post-del'] = async el => {
@@ -473,7 +540,7 @@
     document.title = (p ? p.name + '님' : '프로필') + ' | ' + CHURCH.name;
     if (!p) { C.innerHTML = '<div class="mb-card"><p class="empty" style="padding:48px 0"><span class="ms big">person_off</span><br>찾을 수 없는 회원입니다.</p><div class="btn-row center" style="margin-top:0"><a class="btn line" href="home.html">홈으로</a></div></div>'; return; }
     const F = p.fields, row = (l, v) => v ? `<div><dt>${l}</dt><dd>${v}</dd></div>` : '';
-    const chips = a => (Array.isArray(a) ? a : [a]).map(t => `<span class="chip">${esc(t)}</span>`).join('');
+    const chips = a => (Array.isArray(a) ? a : [a]).map(t => `<span class="chip${t.includes('승인 대기') ? ' wait' : t.includes('승인 안 됨') ? ' no' : ''}">${esc(t)}</span>`).join('');
     const posts = p.demo ? [] : Store.postsOfUser(p.id);
     const sub = [F.position, ...(Array.isArray(F.groups) ? F.groups : [])].filter(Boolean).join(' · ');
     C.innerHTML = `<div class="pf"><section class="pf-card"><span class="avatar-m pf-av">${p.avatar ? `<img src="${p.avatar}" alt="">` : '<span class="ms">person</span>'}</span>
@@ -500,6 +567,7 @@
     const B = BOARDS[board], rule = WRITE_RULE[board] || 'none', m = Store.me();
     const back = 'board.html?b=' + board;
     const stop = (icon, msg, extra) => { C.innerHTML = `<div class="mb-card"><p class="empty" style="padding:40px 0"><span class="ms big">${icon}</span><br>${msg}</p>${extra || ''}<div class="btn-row center" style="margin-top:8px"><a class="btn line" href="${back}">목록으로</a></div></div>`; };
+    if (Store.writeError()) return stop('block', esc(Store.writeError()));
     if (!B || rule === 'none') return stop('block', '이 게시판에는 글쓰기가 없습니다.');
     if (rule === 'admin' && !Store.isAdmin()) return stop('lock', '이 게시판은 교회에서만 글을 올릴 수 있습니다.', '<p class="fld-h" style="text-align:center">시험 중에는 마이페이지에서 “시험용 관리자 모드”를 켜면 쓸 수 있습니다.</p><div class="btn-row center" style="margin-top:12px"><a class="btn" href="mypage.html">마이페이지로</a></div>');
     let post = null;
@@ -582,12 +650,13 @@
   }
   Actions['post-save'] = form => {
     clearErr(form);
+    if (Store.writeError()) return setErr(form, 'form', Store.writeError());
     const ed = $('#ed'), title = form.title.value.trim();
     if (!title) return setErr(form, 'title', '제목을 입력해 주세요.');
     if (!ed.textContent.trim() && !ed.querySelector('img')) { form.querySelector('[data-err="form"]').textContent = '내용을 입력해 주세요.'; ed.focus(); return; }
     const anon = !!form.querySelector('[name="nm"][value="anon"]:checked');
     const p = Store.savePost({ id: form.dataset.edit || null, board: form.dataset.board, title, html: ed.innerHTML, anon });
-    if (!p) { Modal.alert(QUOTA_MSG, { title: '저장 공간 부족' }); usage(); return; }
+    if (!p) { if (Store.writeError()) return setErr(form, 'form', Store.writeError()); Modal.alert(QUOTA_MSG, { title: '저장 공간 부족' }); usage(); return; }
     toastLater(form.dataset.edit ? '글을 수정했습니다' : '글을 저장했습니다'); location.href = 'board-view.html?b=' + form.dataset.board + '&id=' + p.id;
   };
 
@@ -615,6 +684,7 @@
     const h = location.hash; if (/^#c-/.test(h)) { const t = document.getElementById(h.slice(1)); if (t) { t.classList.add('flash'); t.scrollIntoView({ block: 'center' }); } }
   }
   function cmtForm(m, anonOk, parent) {
+    if (Store.writeError()) return `<p class="note-box ban-notice" role="note">${esc(Store.writeError())}</p>`;
     return `<form class="cmt-form${parent ? ' reply' : ''}" data-action="cmt-add"${parent ? ` data-parent="${parent}"` : ''} novalidate>
         <p class="cmt-as"><span class="ms">person</span>${m ? esc(m.name) + '(으)로 작성' : '로그인하지 않아 “게스트”로 작성됩니다'}</p>
         ${anonOk ? `<div class="wr-anon"><label><input type="radio" name="nm" value="real" checked> 이름 공개</label><label><input type="radio" name="nm" value="anon"> 익명</label></div>` : ''}
@@ -623,6 +693,7 @@
         <div class="cmt-act"><span class="cnt-t">0 / 500</span><span class="cmt-btns">${parent ? '<button type="button" class="btn line" data-action="cmt-reply-cancel">취소</button>' : ''}<button class="btn" type="submit">${parent ? '답글 등록' : '댓글 등록'}</button></span></div></form>`;
   }
   Actions['cmt-add'] = form => {
+    if (Store.writeError()) return setErr(form, 'text', Store.writeError());
     const root = form.closest('[data-cmt-root]'), text = form.text.value.trim();
     const reply = !!form.dataset.parent;
     if (!text) return setErr(form, 'text', (reply ? '답글' : '댓글') + ' 내용을 입력해 주세요.');
@@ -633,6 +704,7 @@
   };
   /* "답글"을 누르면 그 댓글 바로 아래에 입력창이 열린다 (답글의 답글도 같은 줄기에 붙는다) */
   Actions['cmt-reply'] = el => {
+    if (Store.writeError()) return toast(Store.writeError(), 'block');
     const root = el.closest('[data-cmt-root]'), it = el.closest('.cmt-it'), was = root.querySelector('.cmt-form.reply');
     if (was) { const same = was.previousElementSibling === it; was.remove(); if (same) return; }
     const m = Store.me(), anonOk = BOARDS[root.dataset.board] && BOARDS[root.dataset.board].anon;

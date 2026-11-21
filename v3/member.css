@@ -128,7 +128,7 @@
 .wr-anon label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .wr-anon input{width:18px;height:18px;accent-color:var(--navy)}
 .ed-wrap{display:flex;flex-direction:column}
-.ed-tb{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:#f3f5f9;border:1px solid #cfd5e2;border-radius:12px 12px 0 0;position:sticky;top:88px;z-index:5}
+.ed-tb{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:#f3f5f9;border:1px solid #cfd5e2;border-radius:12px 12px 0 0;position:sticky;top:calc(var(--header-height) + var(--subnav-height));z-index:5}
 .tb-g{display:flex;align-items:center;gap:2px;padding-right:8px;margin-right:4px;border-right:1px solid #d6dbe6}
 .tb-g:last-child{border-right:0}
 .ed-tb button{min-width:42px;height:42px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:var(--ink);font-size:15px;font-weight:600}
@@ -203,7 +203,7 @@
 @media (max-width:1024px){
   .hd-top{display:none}
   .gnb-user{display:flex;flex-wrap:wrap;align-items:center;gap:8px 22px;padding:18px 24px;background:var(--bg);border-bottom:1px solid var(--line);font-size:17px}
-  .ed-tb{top:69px}
+  .ed-tb{top:calc(var(--header-height) + var(--subnav-height))}
   .mp{grid-template-columns:1fr}
 }
 @media (max-width:720px){
@@ -695,3 +695,29 @@ a.set-row:hover,button.set-row:hover,.set-row:focus-visible{background:#f6f8fb}
 .consent-copy p+p{margin-top:.55em}
 .consent-row .consent-copy{grid-column:1/-1;padding-left:26px;font-size:14px;line-height:1.65;color:var(--muted)}
 .fld input:disabled{background:#f3f5f8;color:var(--muted)}
+
+/* 관리·이의신청: 기존 설정 행과 폼을 재사용 */
+.admin-row{grid-template-columns:24px minmax(0,1fr) auto 24px}
+.admin-row>.ms:last-child{grid-column:4}
+.admin-count{grid-column:3;min-width:24px;padding:1px 7px;border-radius:999px;background:#eef1f7;color:var(--navy);font-size:13px;text-align:center}
+.admin-search{margin-bottom:16px}
+.admin-search input{min-width:0;flex:1}
+.ban-notice{border:1px solid #e8b6b0;background:#fff1ef;color:#a52b22;overflow-wrap:anywhere}
+.form-dialog{width:min(520px,calc(100% - 32px));max-height:calc(100dvh - 32px);margin:auto;padding:24px;border:0;border-radius:16px;background:#fff;color:var(--text);overflow-y:auto;overscroll-behavior:contain}
+.form-dialog:modal{overscroll-behavior:contain}
+.form-dialog::backdrop{background:rgba(10,14,24,.55);overflow:hidden;overscroll-behavior:contain}
+.form-dialog .mb-form{width:100%;margin:0}
+.form-dialog .fld{display:block;margin-top:16px}
+.form-dialog textarea{display:block;width:100%}
+.praise-play{margin:6px 0 6px 8px;white-space:nowrap}
+.video-ph:focus-visible{outline:3px solid var(--navy);outline-offset:4px}
+@media (max-width:360px){
+  .hd-in{gap:4px}
+  .logo{gap:6px;min-width:0}
+  .logo-img{width:32px;height:32px;flex:none}
+  .logo-txt{font-size:18px;white-space:nowrap}
+  .hd-r{flex:none}
+  .hd-r .burger,.hd-r .bell{width:40px;min-width:40px}
+  .gnb-user{padding-inline:16px;gap:8px 14px}
+  .praise-play{margin-left:0}
+}

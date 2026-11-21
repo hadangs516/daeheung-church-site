@@ -1,6 +1,6 @@
 /* 시안용 가짜 데이터 (실제 성도 이름·사진 없음) */
-// 매 업데이트마다 시맨틱 버전 x.y.z를 올립니다 (주 버전: 출시·대규모 변경, 부 버전: 기능 추가, 패치: 작은 수정).
-const APP_VERSION = '0.4.0';
+// x.y.z: 주 버전 = 사이트 구조 세대(v1, v2, v4(폐기), v3는 네 번째 구조 → 4), 부 버전 = 기능 업데이트, 패치 = 작은 수정.
+const APP_VERSION = '4.1.0';
 const CHURCH = {
   name: '포항대흥교회',
   address: '경북 포항시 남구 희망대로 466',
@@ -121,7 +121,8 @@ const EVENTS = [
 
 /* ---------- 글 페이지 ---------- */
 const TBL = (head, rows) => '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
-const VIDEO = (title) => '<div class="video-ph" data-action="soon"><img src="img/hero-interior.jpg" alt=""><span class="play"><span class="ms">play_arrow</span></span><span class="cap">' + title + '</span></div>';
+const VIDEO = (title) => '<div class="video-ph" data-action="soon" role="button" tabindex="0" aria-label="' + title + ' 영상 재생 (시안)"><img src="img/hero-interior.jpg" alt=""><span class="play"><span class="ms">play_arrow</span></span><span class="cap" aria-live="polite">' + title + '</span></div>';
+const PRAISE = (title, rows) => VIDEO(title) + '<h3 class="h3">지난 찬양</h3>' + TBL(['날짜', '찬양'], rows.map(([date, name]) => [date, name + ' <button type="button" class="btn sm line praise-play" data-action="praise-play" data-title="' + date + ' · ' + name + '" aria-label="' + date + ' ' + name + ' 영상 보기">영상 보기</button>']));
 
 const PAGES = {
   greeting: { body: `
@@ -180,8 +181,8 @@ const PAGES = {
   sns: { body: '<p class="page-lead">교회 소식을 SNS에서도 만나보세요.</p><ul class="sns">' +
     [['smart_display','유튜브','설교 실황 영상','#e62117'],['photo_camera','인스타그램','교회 사진과 소식','#c13584'],['chat','카카오톡 채널','공지와 주보 알림','#f5c400'],['groups','네이버 밴드','부서별 모임 소식','#2db400']]
       .map(s => '<li><a href="#" data-action="soon"><span class="sns-ic ms" style="background:' + s[3] + '">' + s[0] + '</span><b>' + s[1] + '</b><span>' + s[2] + '</span><span class="go ms">open_in_new</span></a></li>').join('') + '</ul>' },
-  praise1: { body: VIDEO('11월 15일 주일 1부 예배 찬양') + '<h3 class="h3">지난 찬양</h3>' + TBL(['날짜','찬양'], [['2026.11.15','감사 찬양 (찬양팀)'],['2026.11.08','주 은혜임을 (찬양팀)'],['2026.11.01','은혜 아니면 (찬양팀)'],['2026.10.25','내 영혼이 은총 입어 (찬양팀)']]) },
-  praise2: { body: VIDEO('11월 15일 주일 2부 예배 찬양') + '<h3 class="h3">지난 찬양</h3>' + TBL(['날짜','찬양'], [['2026.11.15','감사의 노래 (찬양대)'],['2026.11.08','주의 사랑 (찬양대)'],['2026.11.01','거룩하신 주 (찬양대)'],['2026.10.25','평화의 기도 (찬양대)']]) },
+  praise1: { body: PRAISE('11월 15일 주일 1부 예배 찬양', [['2026.11.15','감사 찬양 (찬양팀)'],['2026.11.08','주 은혜임을 (찬양팀)'],['2026.11.01','은혜 아니면 (찬양팀)'],['2026.10.25','내 영혼이 은총 입어 (찬양팀)']]) },
+  praise2: { body: PRAISE('11월 15일 주일 2부 예배 찬양', [['2026.11.15','감사의 노래 (찬양대)'],['2026.11.08','주의 사랑 (찬양대)'],['2026.11.01','거룩하신 주 (찬양대)'],['2026.10.25','평화의 기도 (찬양대)']]) },
   bonfire: { body: `
     <figure class="img-wide"><img src="img/album-5.jpg" alt=""></figure>
     <div class="prose"><p>모닥불 기도회는 매주 토요일 저녁, 교회 마당에 모여 함께 찬양하고 기도하는 시간입니다. 온 가족이 함께 참여할 수 있습니다.</p></div>

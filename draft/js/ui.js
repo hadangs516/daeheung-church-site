@@ -18,6 +18,14 @@
   /* "준비 중" 안내는 이 하나로 통일 */
   window.soon = () => toast('준비 중입니다. 정식 사이트에서 연결됩니다.', 'construction');
   Actions.soon = (el, e) => { e && e.preventDefault(); soon(); };
+  Actions['praise-play'] = el => {
+    const player = el.closest('#content').querySelector('.video-ph'); if (!player) return;
+    player.querySelector('.cap').textContent = el.dataset.title;
+    player.setAttribute('aria-label', el.dataset.title + ' 영상 재생 (시안)');
+    player.focus({ preventScroll: true });
+    player.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+    toast('선택한 찬양입니다. 시안에서는 예시 영상 화면으로 표시합니다.', 'play_circle');
+  };
   /* 다음 화면에서 보여줄 알림 */
   window.toastLater = msg => { try { sessionStorage.setItem('pdh_flash', msg); } catch (e) {} };
   try { const f = sessionStorage.getItem('pdh_flash'); if (f) { sessionStorage.removeItem('pdh_flash'); setTimeout(() => toast(f), 250); } } catch (e) {}
@@ -48,7 +56,32 @@
 
   /* ===== v3-B: UI 도구 — 점 세 개 메뉴 · 작성자 사진 · 상대 시간 · 신고 ===== */
   const UI = window.UI = window.UI || {};
-  UI.hiddenBadge = post => post.hidden ? '<em class="post-hidden">숨김</em>' : '';
+  UI.hiddenBadge = post => post.hidden ? '<em class="post-hidden">숨김</em>' + (post.id && Store.isMine(post.owner) && Store.pendingAppeal(post.id) ? '<em class="post-hidden">이의신청 검토 중</em>' : '') : '';
+  // 새 관리·이의신청 폼: 기본 dialog가 포커스 이동·복귀, Escape, 배경 비활성화를 맡는다.
+  UI.formDialog = ({ title, body, submit, validate }) => new Promise(resolve => {
+    const dialog = document.createElement('dialog'); dialog.className = 'form-dialog';
+    dialog.setAttribute('aria-label', title);
+    dialog.innerHTML = `<form class="mb-form"><h3 class="modal-t">${escH(title)}</h3><div class="modal-body">${body}</div><p class="field-err" role="alert" data-dialog-error></p><div class="modal-act"><button type="button" class="btn line" data-dialog-cancel>취소</button><button type="submit" class="btn">${escH(submit)}</button></div></form>`;
+    let result = null;
+    dialog.querySelector('[data-dialog-cancel]').addEventListener('click', () => dialog.close());
+    dialog.querySelector('form').addEventListener('submit', e => {
+      e.preventDefault();
+      const values = Object.fromEntries(new FormData(e.currentTarget));
+      const error = validate ? validate(values) : '';
+      if (error) { dialog.querySelector('[data-dialog-error]').textContent = error; return; }
+      result = values; dialog.close();
+    });
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(result); }, { once: true });
+    document.body.append(dialog); dialog.showModal();
+  });
+  UI.appeal = async postId => {
+    if (Store.pendingAppeal(postId)) return toast('이미 이의신청 검토 중입니다', 'info');
+    const values = await UI.formDialog({ title: '이의신청', body: '<p>관리자가 숨긴 글은 직접 해제할 수 없어요. 이의신청을 보내면 관리자가 확인합니다.</p><label class="fld">신청 사유<textarea name="text" rows="5" maxlength="500" required autofocus></textarea></label>', submit: '이의신청 보내기', validate: v => v.text.trim() ? '' : '신청 사유를 입력해 주세요.' });
+    if (!values) return;
+    const r = Store.submitAppeal(postId, values.text);
+    if (!r.ok) return toast(r.error, 'error');
+    toastLater('이의신청을 보냈습니다'); location.reload();
+  };
   const mk = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
   let menuClose = null;
   /* ⋮ · ⋯ 팝업 메뉴. items: [{label, icon, danger, onClick}] (PC는 버튼 옆 팝업, 휴대폰은 아래에서 올라오는 목록) */
@@ -110,12 +143,13 @@
   /* 신고하기: 사유 고르기 → Store.report. o = {kind:'post'|'comment'|'image', id, label, link} */
   const REASONS = ['광고·홍보 글이에요', '욕설이나 다툼이 있어요', '개인 정보가 나와 있어요', '교회와 관계없는 내용이에요', '기타'];
   UI.report = o => {
+    if (Store.writeError()) { toast(Store.writeError(), 'block'); return Promise.resolve(false); }
     let reason = REASONS[0], text = '';
     const what = { post: '글', comment: '댓글', image: '사진' }[o.kind] || '내용';
     const p = Modal.open({ title: what + ' 신고하기', body: '<p class="rp-q">어떤 점이 불편하셨나요?</p><div class="rp-list" role="radiogroup">' + REASONS.map((r, i) => '<label class="rp-it"><input type="radio" name="rp" value="' + i + '"' + (i === 0 ? ' checked' : '') + '><span>' + escH(r) + '</span></label>').join('') + '</div><textarea class="rp-text" rows="3" maxlength="200" placeholder="자세한 내용을 적어 주세요 (선택)" aria-label="자세한 내용"></textarea><p class="rp-n">신고 내용은 관리자만 볼 수 있어요.</p>', actions: [{ label: '취소', value: false, kind: 'line' }, { label: '신고하기', value: true }] });
     const m = document.querySelector('.modal:last-of-type');
     if (m) { m.addEventListener('change', e => { if (e.target.name === 'rp') reason = REASONS[+e.target.value]; }); m.addEventListener('input', e => { if (e.target.classList.contains('rp-text')) text = e.target.value; }); }
-    return p.then(ok => { if (ok !== true) return false; Store.report({ kind: o.kind, id: o.id, reason, text: text.trim(), link: o.link || (location.pathname.split('/').pop() + location.search), label: o.label || '' }); toast('신고해 주셔서 고맙습니다. 관리자가 확인할게요.', 'info'); return true; });
+    return p.then(ok => { if (ok !== true) return false; const r = Store.report({ kind: o.kind, id: o.id, reason, text: text.trim(), link: o.link || (location.pathname.split('/').pop() + location.search), label: o.label || '' }); if (!r) { toast(Store.writeError() || '신고를 저장하지 못했습니다', 'error'); return false; } toast('신고해 주셔서 고맙습니다. 관리자가 확인할게요.', 'info'); return true; });
   };
 
   /* ---------- 클릭·입력 연결 (data-action) ---------- */

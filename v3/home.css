@@ -9,9 +9,11 @@
   --card:#ffffff;
   --gold:#b8935a;
   --wrap:1240px;
+  --header-height:130px;
+  --subnav-height:0px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:calc(var(--header-height) + var(--subnav-height) + 16px)}
 body{font-family:Pretendard,"Malgun Gothic",sans-serif;color:var(--text);background:var(--bg);font-size:17px;line-height:1.6;word-break:keep-all;-webkit-font-smoothing:antialiased}
 body.lock{overflow:hidden}
 a{color:inherit;text-decoration:none}
@@ -23,6 +25,8 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 
 /* ---------- header ---------- */
 .hd{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line)}
+.site-header{position:sticky;top:0;z-index:50}
+.site-header .hd{position:relative;top:auto}
 .hd-in{display:flex;align-items:center;justify-content:space-between;height:88px}
 .logo{display:flex;align-items:center;gap:10px;color:var(--navy)}
 .logo-mark{font-size:38px}
@@ -154,12 +158,13 @@ button{font:inherit;background:none;border:0;cursor:pointer;color:inherit}
 
 /* ---------- mobile ---------- */
 @media (max-width:1024px){
+  :root{--header-height:69px}
   .hero{min-height:440px;background-image:linear-gradient(90deg,rgba(255,255,255,.92),rgba(255,255,255,.76) 220px,rgba(255,255,255,.62) 445px,rgba(255,255,255,0) 580px),url(img/hero-exterior.jpg)}
   .hd-in{height:68px}
   .logo-mark{font-size:30px}
   .logo-txt{font-size:22px}
   .burger{display:flex}
-  .gnb{position:fixed;top:69px;left:0;right:0;bottom:0;background:#fff;overflow-y:auto;transform:translateX(100%);transition:transform .25s}
+  .gnb{position:fixed;top:var(--header-height);left:0;right:0;bottom:0;background:#fff;overflow-y:auto;transform:translateX(100%);transition:transform .25s}
   .gnb.open{transform:none}
   .gnb>ul{display:block;padding:8px 0 40px}
   .gnb>ul>li{border-bottom:1px solid var(--line)}

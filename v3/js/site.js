@@ -32,11 +32,17 @@
   const hd = $('#hd');
   if (hd) {
     hd.insertAdjacentHTML('beforebegin', `<div class="hd-top"><div class="wrap">${authLinks()}</div></div>`);
+    const headerBlock = document.createElement('div'); headerBlock.className = 'site-header';
+    const topBar = hd.previousElementSibling; topBar.before(headerBlock); headerBlock.append(topBar, hd);
     hd.innerHTML = `<div class="wrap hd-in">
       <a class="logo" href="home.html"><img class="logo-img" src="img/brand/icon-192.png" alt=""><span class="logo-txt">${CHURCH.name}</span></a>
       <nav class="gnb" id="gnb"><div class="gnb-user">${authLinks(true)}</div><ul>${MENU.map((g, gi) => `<li class="${gi === curGroup ? 'cur' : ''}"><a href="${g.items[0][1]}">${g.label}</a>
         <ul class="sub">${g.items.map(it => `<li><a href="${it[1]}"${it === curItem ? ' class="on"' : ''}>${it[0]}</a></li>`).join('')}</ul></li>`).join('')}</ul></nav>
       <div class="hd-r">${bellBtn('bell-m')}<button class="burger" id="burger" aria-label="메뉴 열기"><span class="ms">menu</span></button></div></div>`;
+    const sizeHeader = () => document.documentElement.style.setProperty('--header-height', headerBlock.getBoundingClientRect().height + 'px');
+    sizeHeader();
+    if (window.ResizeObserver) new ResizeObserver(sizeHeader).observe(headerBlock);
+    else addEventListener('resize', sizeHeader);
     const b = $('#burger'), g = $('#gnb');
     b.addEventListener('click', () => { const o = g.classList.toggle('open'); document.body.classList.toggle('lock', o); b.querySelector('.ms').textContent = o ? 'close' : 'menu'; });
     /* 모바일: 상위 메뉴를 누르면 하위 메뉴가 부드럽게 펼쳐지고 접힌다 (높이 애니메이션 + 화살표 회전) */
@@ -51,13 +57,14 @@
   }
 
   /* ---------- 알림함 ---------- */
-  const NI = { signup: 'person_add', approval: 'verified', group: 'groups', comment: 'chat_bubble', reply: 'reply', bulletin: 'menu_book', notice: 'campaign' };
+  const NI = { signup: 'person_add', approval: 'verified', group: 'groups', comment: 'chat_bubble', reply: 'reply', bulletin: 'menu_book', notice: 'campaign', report: 'flag', appeal: 'gavel', sanction: 'block' };
   function refreshBells() {
     const n = Store.me() ? Store.unreadCount() : 0;
     document.querySelectorAll('.bell').forEach(b => { const i = b.querySelector('.bell-n'); i.hidden = !n; i.textContent = n > 99 ? '99+' : n; b.setAttribute('aria-label', n ? '알림함, 안 읽은 알림 ' + n + '개' : '알림함'); });
   }
   refreshBells();
   addEventListener('storage', refreshBells);
+  addEventListener('pdh-notifs', refreshBells);
   Actions['notif-open'] = btn => {
     if (document.querySelector('.np-bg')) return;
     const bg = document.createElement('div'), mobile = matchMedia('(max-width:720px)').matches;
@@ -126,6 +133,11 @@
       <main class="sub-main"><div class="sub-hd"><h2>${heading}</h2><p class="crumb"><span class="ms">home</span>홈<span class="ms">chevron_right</span>${group.label}<span class="ms">chevron_right</span>${file === 'write.html' ? title + '<span class="ms">chevron_right</span>' : ''}<b>${heading}</b></p></div>
       <div id="content"></div></main></div>`;
   const C = $('#content');
+  const mobileSubnav = $('.snb-m');
+  const sizeSubnav = () => document.documentElement.style.setProperty('--subnav-height', (mobileSubnav ? mobileSubnav.getBoundingClientRect().height : 0) + 'px');
+  sizeSubnav();
+  if (mobileSubnav && window.ResizeObserver) new ResizeObserver(sizeSubnav).observe(mobileSubnav);
+  else addEventListener('resize', sizeSubnav);
   const onChip = $('.snb-m a.on'); if (onChip) { const ul = onChip.closest('ul'); ul.scrollLeft = onChip.offsetLeft - (ul.clientWidth - onChip.offsetWidth) / 2; }
 
   /* 페이지 넘김 (실제 개수만큼) */
@@ -216,6 +228,7 @@
     Actions['post-more'] = btn => UI.menu(btn, [
       mine && { label: '수정', icon: 'edit', onClick: () => { location.href = `write.html?b=${b}&edit=${id}`; } },
       canDel && { label: U.hidden ? '숨김 해제' : '숨기기', icon: U.hidden ? 'visibility' : 'visibility_off', onClick: () => {
+        if (U.hidden && U.hiddenBy === 'admin' && !Store.isAdmin()) return UI.appeal(id);
         if (!Store.setPostHidden(id, !U.hidden)) return toast('숨김 상태를 변경하지 못했습니다', 'error');
         toastLater(U.hidden ? '숨김을 해제했습니다' : '글을 숨겼습니다'); location.reload();
       } },

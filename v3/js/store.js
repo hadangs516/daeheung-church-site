@@ -6,7 +6,7 @@
    ============================================================ */
 (function () {
   const K = { users: 'pdh_users', session: 'pdh_session', posts: 'pdh_posts', comments: 'pdh_comments', admin: 'pdh_admin', guest: 'pdh_guest', leaders: 'pdh_leaders', prefs: 'pdh_prefs' };
-  Object.assign(K, { notifs: 'pdh_notifs', nprefs: 'pdh_notif_prefs', reports: 'pdh_reports' });   // v3-B: 알림·신고
+  Object.assign(K, { notifs: 'pdh_notifs', nprefs: 'pdh_notif_prefs', reports: 'pdh_reports', appeals: 'pdh_appeals' });
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -22,7 +22,13 @@
   const makeSalt = () => hex(crypto.getRandomValues(new Uint8Array(16)));
 
   /* ---------- 회원 ---------- */
-  const users = () => read(K.users, []);
+  // 예전 데이터의 문자열 교구·상태 없는 교구도 신청으로 복원한다.
+  // 이전에는 상태가 없으면 승인 큐에서 빠지고, 화면에서는 승인된 것처럼 보였다.
+  const users = () => read(K.users, []).map(u => {
+    if (typeof u.parish === 'string') u.parish = { id: u.parish };
+    if (u.parish && !['pending', 'approved', 'rejected'].includes(u.parish.status)) u.parish.status = 'pending';
+    return u;
+  });
   const saveUsers = u => write(K.users, u);
   const me = () => { const s = read(K.session, null); return s ? (users().find(u => u.id === s.id) || null) : null; };
   const SENS = ['name', 'rank', 'birth', 'phone'];   // 바꾸면 교회 승인이 필요한 신상 항목
@@ -58,7 +64,7 @@
     list.push(u);
     if (!saveUsers(list)) return { ok: false, error: '저장 공간이 가득 찼습니다.' };
     write(K.session, { id: u.id });
-    sendNotif({ to: 'admin', type: 'signup', text: '새 가입 신청이 있어요: ' + u.name + '님', link: 'mypage.html#approve' });
+    sendNotif({ to: 'admin', type: 'signup', text: '새 가입 신청이 있어요: ' + u.name + '님', link: 'mypage.html#admin/signup' });
     notifyAffil(u, news);
     return { ok: true, user: u };
   }
@@ -83,7 +89,7 @@
     const keys = Object.keys(pend), diff = JSON.stringify(pend) !== before ? keys : [];
     u.pending = keys.length ? Object.assign(pend, { at: Date.now() }) : null;
     if (!saveUsers(list)) return { ok: false, error: '저장 공간이 가득 찼습니다. 사진을 줄이거나 예전 글을 지워 주세요.' };
-    if (diff.length) sendNotif({ to: 'admin', type: 'signup', text: u.name + '님이 정보 변경을 요청했어요', link: 'mypage.html#approve' });
+    if (diff.length) sendNotif({ to: 'admin', type: 'signup', text: u.name + '님이 정보 변경을 요청했어요', link: 'mypage.html#admin/profile' });
     notifyAffil(u, news);
     return { ok: true, pending: !!u.pending, changed: diff };
   }
@@ -91,18 +97,25 @@
   async function changePassword(cur, next) {
     const list = users(), u = list.find(x => x.id === (me() || {}).id); if (!u) return { ok: false, error: '로그인이 필요합니다.' };
     if ((await hashPw(cur, u.salt)) !== u.hash) return { ok: false, field: 'cur', error: '현재 비밀번호가 맞지 않습니다.' };
-    u.salt = makeSalt(); u.hash = await hashPw(next, u.salt); saveUsers(list); return { ok: true };
+    u.salt = makeSalt(); u.hash = await hashPw(next, u.salt);
+    if (!saveUsers(list)) return { ok: false, error: '비밀번호를 저장하지 못했습니다.' };
+    logout(); return { ok: true };
   }
-  function withdraw(opt) {                    // 탈퇴. opt.deleteContent 가 참일 때만 내 글·댓글도 지움(기본: 남김, 작성자 이름만 남음)
-    const m = me(); if (!m) return;
-    saveUsers(users().filter(u => u.id !== m.id));
+  async function verifyPassword(password) {
+    const m = me();
+    return !!m && typeof password === 'string' && (await hashPw(password, m.salt)) === m.hash;
+  }
+  async function withdraw(opt = {}) {          // 비밀번호를 다시 확인한 뒤 탈퇴
+    const m = me(); if (!m) return { ok: false, error: '로그인이 필요합니다.' };
+    if (!(await verifyPassword(opt.password))) return { ok: false, field: 'password', error: '비밀번호가 맞지 않습니다' };
+    if (!saveUsers(users().filter(u => u.id !== m.id))) return { ok: false, error: '탈퇴 정보를 저장하지 못했습니다.' };
     if (opt && opt.deleteContent) {
       write(K.posts, read(K.posts, []).filter(p => p.owner !== m.id));
       write(K.comments, read(K.comments, []).filter(c => c.owner !== m.id));
     }
     write(K.notifs, read(K.notifs, []).filter(n => n.to !== m.id));
     const L = leaders(); ['groups', 'parishes'].forEach(k => Object.keys(L[k]).forEach(i => { L[k][i] = L[k][i].filter(x => x !== m.id); })); write(K.leaders, L);
-    logout();
+    logout(); return { ok: true };
   }
   function resetAll() { Object.values(K).forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); }
 
@@ -111,6 +124,7 @@
   const setAdmin = on => { try { localStorage.setItem(K.admin, on ? '"1"' : '"0"'); } catch (e) {} };
   const pendingList = () => users().filter(u => u.pending).map(u => ({ id: u.id, name: u.name, username: u.username, pending: u.pending, before: u }));
   function resolvePending(id, ok) {
+    if (!isAdmin()) return false;
     const list = users(), u = list.find(x => x.id === id); if (!u || !u.pending) return;
     if (ok) SENS.forEach(k => { if (k in u.pending && k !== 'at') u[k] = u.pending[k]; });
     u.pending = null; saveUsers(list);
@@ -133,6 +147,7 @@
   const leaders = () => { const L = read(K.leaders, null) || {}; return { groups: L.groups || {}, parishes: L.parishes || {} }; };
   const leaderIds = (kind, id) => (leaders()[kind === 'group' ? 'groups' : 'parishes'][id] || []);
   function setLeader(kind, id, uidv, on) {
+    if (!isAdmin()) return false;
     const L = leaders(), k = kind === 'group' ? 'groups' : 'parishes', s = new Set(L[k][id] || []);
     on ? s.add(uidv) : s.delete(uidv); L[k][id] = [...s]; write(K.leaders, L);
   }
@@ -141,6 +156,7 @@
 
   /* 선택한 소속·교구를 회원에게 반영. 이미 승인된 것은 그대로, 새로 고른 것은 '대기'. 새로 대기가 된 항목 목록을 돌려줌 */
   function applyAffil(u, groups, parishId) {
+    parishId = typeof parishId === 'object' ? (parishId && parishId.id) || '' : String(parishId || '');
     const old = u.groups || [], news = [];
     u.groups = (groups || []).map(g => {
       const had = old.find(o => o.id === g.id && o.role === g.role);
@@ -161,7 +177,7 @@
     (news || []).forEach(n => {
       const ids = leaderIds(n.kind, n.id), name = n.kind === 'group' ? groupName(n.id) : parishName(n.id);
       const text = u.name + '님이 ' + (n.kind === 'group' ? name + ' 소속을' : name + '를') + ' 신청했어요. 확인해 주세요';
-      if (ids.length) ids.forEach(t => sendNotif({ to: t, type: 'group', text, link: 'mypage.html#approve' })); else sendNotif({ to: 'admin', type: 'group', text, link: 'mypage.html#approve' });
+      if (ids.length) ids.forEach(t => sendNotif({ to: t, type: 'group', text, link: 'mypage.html#admin/affil' })); else sendNotif({ to: 'admin', type: 'group', text, link: 'mypage.html#admin/affil' });
     });
   }
   /* 내가 승인할 수 있는 소속·교구 신청 (대표는 자기 부서, 관리자 모드는 전부) */
@@ -189,6 +205,7 @@
   /* 홈페이지 가입 승인(전체 관리자) */
   const signupList = () => users().filter(u => u.status === 'pending').map(u => ({ id: u.id, name: u.name, username: u.username, rank: u.rank, createdAt: u.createdAt }));
   function resolveSignup(id, ok) {
+    if (!isAdmin()) return false;
     const list = users(), u = list.find(x => x.id === id); if (!u || u.status !== 'pending') return;
     u.status = ok ? 'approved' : 'rejected'; saveUsers(list);
     sendNotif({ to: u.id, type: 'approval', text: ok ? '가입이 승인되었어요. 환영합니다!' : '가입 승인이 아직 되지 않았어요. 교회에 문의해 주세요', link: 'mypage.html' });
@@ -218,7 +235,8 @@
       out.fields = { position: u.rank, groups: u.groups.map(groupText), parish: parishName(u.parish.id), bio: u.bio }; return out;
     }
     const vis = g => self || g.status === 'approved';
-    const val = { position: u.rank || '', groups: (u.groups || []).filter(vis).map(g => groupText(g) + (g.status !== 'approved' ? ' (승인 대기)' : '')), parish: u.parish && vis(u.parish) ? parishName(u.parish.id) + (u.parish.status !== 'approved' ? ' (승인 대기)' : '') : '', birth: u.birth || '', phone: u.phone || '', bio: u.bio || '' };
+    const affilSuffix = g => g.status === 'rejected' ? ' (승인 안 됨)' : g.status !== 'approved' ? ' (승인 대기)' : '';
+    const val = { position: u.rank || '', groups: (u.groups || []).filter(vis).map(g => groupText(g) + affilSuffix(g)), parish: u.parish && vis(u.parish) ? parishName(u.parish.id) + affilSuffix(u.parish) : '', birth: u.birth || '', phone: u.phone || '', bio: u.bio || '' };
     PRIV_FIELDS.forEach(([k]) => { if (can(k)) { if (val[k] && val[k].length !== 0) out.fields[k] = val[k]; } else out.hidden.push(k); });
     if (self) out.privacy = privOf(u);
     out.needLogin = !viewer && PRIV_FIELDS.some(([k]) => privOf(u)[k] === 'members' && val[k] && val[k].length !== 0);   // 로그인하면 더 볼 수 있는 항목이 있는지
@@ -227,7 +245,32 @@
   const postsOfUser = id => rawPosts().filter(p => p.owner === id && !p.anon && canSeePost(p)).sort((a, b) => b.at - a.at);
   const prefs = () => Object.assign({ bigText: false }, read(K.prefs, {}));
   const setPref = (k, v) => { const p = prefs(); p[k] = v; write(K.prefs, p); };
-  const allMembers = () => users().map(u => ({ id: u.id, name: u.name, username: u.username, rank: u.rank }));
+  const allMembers = () => isAdmin() ? users().map(u => ({ id: u.id, name: u.name, username: u.username, rank: u.rank, status: statusOf(u), ban: u.ban || null })) : [];
+  const activeBan = (u = me()) => u && u.ban && (u.ban.until === null || u.ban.until > Date.now()) ? u.ban : null;
+  function writeError(u = me()) {
+    const b = activeBan(u); if (!b) return '';
+    const d = b.until === null ? '영구' : (() => { const t = new Date(b.until); return t.getFullYear() + '.' + pad(t.getMonth() + 1) + '.' + pad(t.getDate()) + '까지'; })();
+    return '이용이 제한된 계정입니다 (사유: ' + b.reason + ' · ' + d + ')';
+  }
+  function sanctionUser(id, days, reason) {
+    if (!isAdmin()) return { ok: false, error: '관리자만 제재할 수 있습니다.' };
+    reason = String(reason || '').trim();
+    if (!reason || reason.length > 500) return { ok: false, error: '제재 사유를 1~500자로 입력해 주세요.' };
+    if (days !== null && (!Number.isInteger(days) || days < 1 || days > 3650)) return { ok: false, error: '기간은 1~3650일로 입력해 주세요.' };
+    const list = users(), u = list.find(x => x.id === id); if (!u) return { ok: false, error: '회원을 찾을 수 없습니다.' };
+    u.ban = { until: days === null ? null : Date.now() + days * 86400000, reason, at: Date.now(), by: me().id };
+    if (!saveUsers(list)) return { ok: false, error: '제재를 저장하지 못했습니다.' };
+    notify({ to: u.id, type: 'sanction', text: writeError(u), link: 'mypage.html#info' });
+    return { ok: true };
+  }
+  function liftSanction(id) {
+    if (!isAdmin()) return { ok: false, error: '관리자만 해제할 수 있습니다.' };
+    const list = users(), u = list.find(x => x.id === id); if (!u) return { ok: false, error: '회원을 찾을 수 없습니다.' };
+    delete u.ban;
+    if (!saveUsers(list)) return { ok: false, error: '해제 정보를 저장하지 못했습니다.' };
+    notify({ to: u.id, type: 'sanction', text: '이용 제재가 해제되었습니다. 다시 글과 댓글을 쓸 수 있습니다.', link: 'mypage.html#info' });
+    return { ok: true };
+  }
 
   /* ---------- 글 ---------- */
   function guestKey() { let g = read(K.guest, null); if (!g) { g = 'g' + uid(); write(K.guest, g); } return g; }
@@ -254,7 +297,7 @@
     const fake = boardPosts(b).map(p => Object.assign(p, { id: String(p.id), comments: fakeCount(b, p.id) + rawComments().filter(c => c.board === b && c.postId === String(p.id)).length }));
     fake.forEach(p => { p.authorId = BOARDS[b].anon ? null : 'demo:' + p.author; });
     const mine = rawPosts().filter(p => p.board === b && canSeePost(p)).sort((x, y) => y.at - x.at).map(p => ({
-      id: p.id, title: p.title, date: p.date, author: displayAuthor(p), authorId: p.anon || !users().some(u => u.id === p.owner) ? null : p.owner, at: p.at, views: p.views || 0, pinned: false, user: true, owner: p.owner, hidden: !!p.hidden,
+      id: p.id, title: p.title, date: p.date, author: displayAuthor(p), authorId: p.anon || !users().some(u => u.id === p.owner) ? null : p.owner, at: p.at, views: p.views || 0, pinned: false, user: true, owner: p.owner, hidden: !!p.hidden, hiddenBy: p.hiddenBy,
       hasPhoto: /<img/.test(p.html), hasFile: false, comments: commentCount(b, p.id) }));
     const pinned = fake.filter(p => p.pinned), rest = fake.filter(p => !p.pinned);
     return pinned.concat(mine, rest);
@@ -263,11 +306,37 @@
   function setPostHidden(id, hidden) {
     const list = rawPosts(), p = list.find(x => x.id === id);
     if (!p || !(isMine(p.owner) || isAdmin())) return false;
-    if (hidden) p.hidden = true;
-    else delete p.hidden;
+    if (!isAdmin() && p.hidden && p.hiddenBy === 'admin') return false;
+    if (hidden) { p.hidden = true; p.hiddenBy = isAdmin() ? 'admin' : 'author'; p.hiddenAt = Date.now(); }
+    else { delete p.hidden; delete p.hiddenBy; delete p.hiddenAt; }
     return write(K.posts, list);
   }
+  const hiddenPosts = () => isAdmin() ? rawPosts().filter(p => p.hidden).sort((a, b) => (b.hiddenAt || b.at) - (a.hiddenAt || a.at)) : [];
+  const appeals = () => read(K.appeals, []).filter(a => isAdmin() || a.by === me()?.id).sort((a, b) => b.at - a.at);
+  const pendingAppeal = postId => appeals().find(a => a.postId === postId && a.status === 'pending') || null;
+  function submitAppeal(postId, text) {
+    const m = me(), p = getPost(postId); text = String(text || '').trim();
+    if (!m || !p || p.owner !== m.id || !p.hidden || p.hiddenBy !== 'admin') return { ok: false, error: '이의신청할 수 있는 글이 아닙니다.' };
+    if (!text || text.length > 500) return { ok: false, error: '신청 사유를 1~500자로 입력해 주세요.' };
+    if (pendingAppeal(postId)) return { ok: false, error: '이미 이의신청 검토 중입니다.' };
+    const list = read(K.appeals, []), a = { id: 'a' + uid(), board: p.board, postId, title: p.title, by: m.id, byName: m.name, text, at: Date.now(), status: 'pending', reply: '' };
+    list.push(a);
+    if (!write(K.appeals, list)) return { ok: false, error: '이의신청을 저장하지 못했습니다.' };
+    notifyAdmins('appeal', '새 이의신청: ' + p.title, 'mypage.html#admin/appeals');
+    return { ok: true, appeal: a };
+  }
+  function resolveAppeal(id, accepted, reply) {
+    if (!isAdmin()) return { ok: false, error: '관리자만 처리할 수 있습니다.' };
+    const list = read(K.appeals, []), a = list.find(x => x.id === id);
+    if (!a || a.status !== 'pending') return { ok: false, error: '이미 처리되었거나 없는 신청입니다.' };
+    if (accepted && getPost(a.postId) && !setPostHidden(a.postId, false)) return { ok: false, error: '숨김을 해제하지 못했습니다.' };
+    a.status = accepted ? 'accepted' : 'rejected'; a.reply = String(reply || '').trim().slice(0, 500);
+    if (!write(K.appeals, list)) return { ok: false, error: '처리 결과를 저장하지 못했습니다.' };
+    notify({ to: a.by, type: 'appeal', text: '“' + a.title + '” 이의신청이 ' + (accepted ? '수락' : '거절') + '되었습니다.' + (a.reply ? ' 답변: ' + a.reply : ''), link: commentHref(a.board, a.postId) });
+    return { ok: true };
+  }
   function savePost(f) {
+    if (writeError()) return null;
     const list = rawPosts(), html = sanitize(f.html);
     let p = f.id && list.find(x => x.id === f.id);
     if (p) { p.title = f.title; p.html = html; p.anon = !!f.anon; p.edited = Date.now(); }
@@ -296,6 +365,7 @@
     return commentId ? page + '#c-' + encodeURIComponent(commentId) : page;
   }
   function addComment(f) {
+    if (writeError()) return false;
     const list = rawComments(), m = me();
     let parent = f.parent ? String(f.parent) : null;                        // 답글은 1단계만: 답글에 단 답글은 원래 댓글 아래로
     const pc = parent && list.find(c => c.id === parent); if (pc && pc.parent) parent = pc.parent;
@@ -370,7 +440,7 @@
   function usageKB() { let n = 0; try { Object.values(K).forEach(k => { n += (localStorage.getItem(k) || '').length * 2; }); } catch (e) {} return Math.round(n / 1024); }
 
   window.Store = { me, usernameTaken, signup, hasRequiredConsents, signupBirthError, login, logout, updateProfile, cancelPending, changePassword, withdraw, resetAll, isAdmin, setAdmin, pendingList, resolvePending,
-    SENS, SENS_LABEL, allPosts, getPost, canSeePost, setPostHidden, commentHref, savePost, deletePost, addView, myPosts, isMine, commentsOf, commentCount, addComment, deleteComment, sanitize, resizeImage, usageKB, today };
+    SENS, SENS_LABEL, allPosts, getPost, canSeePost, setPostHidden, hiddenPosts, appeals, pendingAppeal, submitAppeal, resolveAppeal, activeBan, writeError, sanctionUser, liftSanction, verifyPassword, commentHref, savePost, deletePost, addView, myPosts, isMine, commentsOf, commentCount, addComment, deleteComment, sanitize, resizeImage, usageKB, today };
   /* v3-A 회원 확장 내보내기 (A 채팅 구역) */
   Object.assign(window.Store, { userCard, profileOf, postsOfUser, statusOf, privOf, setPrivacy, PRIV_FIELDS, PRIV_LABEL, PRIV_DEFAULT, GROUP_NAMES, EDU, PARISHES, parishName, groupName, groupText,
     leaderIds, setLeader, leaderOf, isLeader, affilQueue, resolveAffil, signupList, resolveSignup, prefs, setPref, allMembers });
@@ -379,6 +449,9 @@
      - 알림 {id,to,type,text,link,at,read}: to = 회원 id 또는 'admin'(관리자 모드에서 보임)
      - 받는 사람이 그 종류를 꺼 두었으면 만들지 않는다. */
   const NOTIF_TYPES = [
+    { id: 'report', label: '신고 접수', desc: '새 신고가 접수되면 알려 드려요 (관리자)' },
+    { id: 'appeal', label: '이의신청', desc: '이의신청 접수와 처리 결과를 알려 드려요' },
+    { id: 'sanction', label: '이용 제재', desc: '이용 제재와 해제를 알려 드려요' },
     { id: 'signup',   label: '새 가입 신청',      desc: '새 회원이 가입을 신청하면 알려 드려요 (관리자)' },
     { id: 'approval', label: '가입·정보 변경 승인', desc: '내 가입이나 정보 변경이 승인되면 알려 드려요' },
     { id: 'group',    label: '소속·교구 승인',     desc: '소속·교구 신청과 그 결과를 알려 드려요' },
@@ -400,8 +473,12 @@
     if (f.to !== 'admin' && !prefsOf(f.to)[f.type]) return null;
     const list = read(K.notifs, []), n = { id: 'n' + uid(), to: f.to, type: f.type, text: String(f.text || ''), link: f.link || '', at: Date.now(), read: false };
     list.push(n); if (list.length > 300) list.splice(0, list.length - 300);
-    write(K.notifs, list); return n;
+    write(K.notifs, list);
+    if (window.dispatchEvent) window.dispatchEvent(new Event('pdh-notifs'));
+    return n;
   }
+  // 관리자는 회원 속성이 아니라 이 기기의 모드 토글이다. 공용 관리자 수신함은 모든 관리자 모드 회원에게 보인다.
+  function notifyAdmins(type, text, link) { return notify({ to: 'admin', type, text, link }); }
   function notifyAll(type, text, link) { const m = me(); users().forEach(u => { if (!m || u.id !== m.id) notify({ to: u.id, type, text, link }); }); }
   function myNotifs(o) {
     const m = me(); if (!m) return [];
@@ -419,14 +496,17 @@
 
   /* 신고: {kind:'post'|'comment'|'image', id, reason, text, link?, label?} */
   function report(f) {
+    if (writeError()) return null;
     if (!f || !f.kind || !f.id) return null;
     const m = me(), list = read(K.reports, []);
     const r = { id: 'r' + uid(), kind: f.kind, targetId: String(f.id), reason: f.reason || '', text: f.text || '', link: f.link || '', label: f.label || '', by: m ? m.id : 'guest', byName: m ? m.name : '게스트', at: Date.now(), done: false };
-    list.push(r); write(K.reports, list); return r;
+    list.push(r); if (!write(K.reports, list)) return null;
+    notifyAdmins('report', '새 신고가 접수되었습니다: ' + (r.label || r.reason || '신고 내용 확인'), 'mypage.html#admin/reports');
+    return r;
   }
-  const reports = () => read(K.reports, []).sort((a, b) => b.at - a.at);
-  function resolveReport(id) { const l = read(K.reports, []), r = l.find(x => x.id === id); if (r) { r.done = true; write(K.reports, l); } }
-  const deleteReport = id => write(K.reports, read(K.reports, []).filter(x => x.id !== id));
+  const reports = () => isAdmin() ? read(K.reports, []).sort((a, b) => b.at - a.at) : [];
+  function resolveReport(id) { if (!isAdmin()) return false; const l = read(K.reports, []), r = l.find(x => x.id === id); if (r) { r.done = true; write(K.reports, l); } }
+  const deleteReport = id => isAdmin() && write(K.reports, read(K.reports, []).filter(x => x.id !== id));
 
   /* 작성자 카드: A의 Store.userCard가 있으면 그것을 쓰고, 없을 때만 이 임시 버전을 쓴다 */
   function cardFallback(id) {
